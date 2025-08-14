@@ -3,8 +3,9 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -14,32 +15,42 @@ class RolePermissionSeeder extends Seeder
 	public function run(): void
 	{
 		// Reset cached roles and permissions
-		app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+		app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
 		// Permissions for task management
 		$permissions = [
-			'manage tasks',
-			'manage projects',
-			'manage users',
-			'view tasks',
-			'view projects',
+			'mengelola user',
+			'mengelola role',
+			'mengelola project',
+			'mengelola tugas',
+			'melihat project',
+			'melihat tugas',
+			'mencetak laporan',
 		];
 
-		foreach ($permissions as $perm) {
-			Permission::firstOrCreate(['name' => $perm]);
+		foreach ($permissions as $permission) {
+			Permission::firstOrCreate(['name' => $permission]);
 		}
 
-		// Roles
+		// Admin: semua permission
 		$admin = Role::firstOrCreate(['name' => 'Admin']);
-		$user = Role::firstOrCreate(['name' => 'User']);
-
-		// Assign all permissions to Admin
 		$admin->syncPermissions($permissions);
 
-		// Assign only view tasks and view projects to User
-		$user->syncPermissions([
-			'view tasks',
-			'view projects',
+		// Manager: tidak bisa kelola user/role
+		$manager = Role::firstOrCreate(['name' => 'Manager']);
+		$manager->syncPermissions([
+			'mengelola project',
+			'mengelola tugas',
+			'melihat project',
+			'melihat tugas',
+			'mencetak laporan',
+		]);
+
+		// Member: hanya bisa lihat project & tugas
+		$member = Role::firstOrCreate(['name' => 'Member']);
+		$member->syncPermissions([
+			'melihat project',
+			'melihat tugas',
 		]);
 	}
 }

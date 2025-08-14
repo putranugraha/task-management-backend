@@ -1,0 +1,19 @@
+
+<?php
+
+namespace App\Services\Implementations;
+
+use App\Services\Contracts\{{name}}ServiceInterface;
+use App\Repositories\Contracts\{{name}}RepositoryInterface;
+
+class {{name}}Service implements {{name}}ServiceInterface
+{
+    protected $repository;
+
+    public function __construct({{name}}RepositoryInterface $repository)
+    {
+        $this->repository = $repository;
+    }
+
+    // Implementasi metode dari {{name}}ServiceInterface
+}

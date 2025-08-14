@@ -1,0 +1,8 @@
+<?php
+
+namespace App\Repositories\Contracts;
+
+interface {{name}}RepositoryInterface
+{
+    // Definisikan metode yang akan diimplementasikan oleh repository
+}
