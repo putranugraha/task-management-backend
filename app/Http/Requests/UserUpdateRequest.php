@@ -2,11 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-/**
- * @method \App\Models\User|null route(string $param = null)
- */
 class UserUpdateRequest extends FormRequest
 {
     /**
@@ -24,10 +23,48 @@ class UserUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $userId = $this->route('user');
+        $user = User::with('roles')->find($userId);
+
         return [
-            'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . ($this->route('user')?->id ?? ''),
-            'password' => 'nullable|string|min:8|confirmed',
-            'status' => 'sometimes|required|in:Aktif,Non Aktif',
+            'name' => 'sometimes|required|string|max:50|min:3',
+            'email' => [
+                'sometimes',
+                'required',
+                'string',
+                'email',
+                'max:50',
+                Rule::unique('users')->ignore($userId),
+            ],
+            'password' => [
+                'nullable',
+                'string',
+                'min:8',
+                'confirmed',
+            ],
+            'password_confirmation' => [
+                'sometimes',
+                'required_with:password',
+                'string',
+                'min:8',
+                'same:password',
+            ],
+            'role' => [
+                'sometimes',
+                'required',
+                'string',
+                Rule::exists('roles', 'name'),
+            ],
+            'status' => [
+                'sometimes',
+                'required',
+                Rule::in(['Aktif', 'Non Aktif']),
+                function ($attribute, $value, $fail) use ($user) {
+                    if ($user && $user->hasRole('Super Admin') && $value === 'Non Aktif') {
+                        $fail('User dengan role Super Admin tidak dapat di-nonaktifkan.');
+                    }
+                },
+            ],
         ];
     }
 }

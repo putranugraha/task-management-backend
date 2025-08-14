@@ -18,10 +18,10 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'email' => $this->email,
             'email_verified_at' => $this->email_verified_at,
-            'anggota_id' => $this->anggota_id,
             'status' => $this->status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+            'role' => $this->roles->first()->name ?? null,
         ];
     }
 }

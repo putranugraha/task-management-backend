@@ -10,44 +10,32 @@ use App\Services\Contracts\UserServiceInterface;
 
 class UserController extends Controller
 {
-    /**
-     * @var UserServiceInterface $userService
-     */
     protected $userService;
 
-    /**
-     * Konstruktor UserController.
-     */
     public function __construct(UserServiceInterface $userService)
     {
         $this->userService = $userService;
     }
 
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $status = $request->query('status');
 
         if ($status === null) {
             $users = $this->userService->getAllUsers();
-        } elseif (in_array($status, ['active', 'inactive', 'suspended', 'pending'])) {
+        } elseif (in_array($status, ['Aktif', 'Non Aktif'])) {
             $users = $this->userService->getUserByStatus($status);
         } else {
             return response()->json(['error' => 'Invalid status parameter'], 400);
         }
 
-        if (!$users) {
+        if (!$users || $users->isEmpty()) {
             return response()->json(['message' => 'User tidak ditemukan'], 404);
         }
 
         return UserResource::collection($users);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(UserStoreRequest $request)
     {
         $user = $this->userService->createUser($request->all());
@@ -57,9 +45,6 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id)
     {
         $user = $this->userService->getUserById($id);
@@ -69,9 +54,6 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UserUpdateRequest $request, string $id)
     {
         $user = $this->userService->updateUser($id, $request->all());
@@ -81,9 +63,6 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         $deleted = $this->userService->deleteUser($id);
@@ -94,13 +73,10 @@ class UserController extends Controller
         return response()->json(['message' => 'User berhasil dihapus']);
     }
 
-    /**
-     * Update Status User.
-     */
     public function updateStatus(string $id, Request $request)
     {
         $request->validate([
-            'status' => 'required|in:active,inactive,suspended,pending',
+            'status' => 'required|in:Aktif,Non Aktif',
         ]);
 
         $user = $this->userService->updateUserStatus($id, $request->input('status'));

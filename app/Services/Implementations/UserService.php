@@ -2,190 +2,111 @@
 
 namespace App\Services\Implementations;
 
+use Illuminate\Support\Facades\Cache;
 use App\Services\Contracts\UserServiceInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
-use Illuminate\Support\Facades\Log;
-use App\Models\User;
 
 class UserService implements UserServiceInterface
 {
-    protected $repository;
+    protected $userRepository;
 
-    public function __construct(UserRepositoryInterface $repository)
+    const USERS_ALL_CACHE_KEY = 'users.all';
+    const USERS_AKTIF_CACHE_KEY = 'users.Aktif';
+    const USERS_NONAKTIF_CACHE_KEY = 'users.NonAktif';
+
+    public function __construct(UserRepositoryInterface $userRepository)
     {
-        $this->repository = $repository;
+        $this->userRepository = $userRepository;
     }
 
-    /**
-     * Mengambil semua users.
-     *
-     * @return mixed
-     */
     public function getAllUsers()
     {
-        try {
-            return $this->repository->getAllUsers();
-        } catch (\Exception $e) {
-            Log::error("Error getting all users: {$e->getMessage()}", ['exception' => $e]);
-            return collect();
-        }
+        return Cache::remember(self::USERS_ALL_CACHE_KEY, 3600, function () {
+            return $this->userRepository->getAllUsers();
+        });
     }
 
-    /**
-     * Mengambil user berdasarkan ID.
-     *
-     * @param int $id The ID of the user.
-     * @return mixed
-     */
     public function getUserById($id)
     {
-        try {
-            return $this->repository->getUserById($id);
-        } catch (\Exception $e) {
-            Log::error("Error getting user by ID {$id}: {$e->getMessage()}", ['exception' => $e]);
-            return null;
-        }
+        return $this->userRepository->getUserById($id);
     }
 
-    /**
-     * Mengambil user berdasarkan status.
-     *
-     * @param string $status
-     * @return mixed
-     */
     public function getUserByStatus($status)
     {
-        try {
-            return $this->repository->getUserByStatus($status);
-        } catch (\Exception $e) {
-            Log::error("Error getting users by status {$status}: {$e->getMessage()}", ['exception' => $e]);
+        // Hanya izinkan status 'Aktif' dan 'Non Aktif'
+        if (!in_array($status, ['Aktif', 'Non Aktif'])) {
             return collect();
         }
+        return $this->userRepository->getUserByStatus($status);
     }
 
-    /**
-     * Membuat user baru.
-     *
-     * @param array $data The data for the new user.
-     * @return mixed
-     */
+    public function getActiveUsers()
+    {
+        return Cache::remember(self::USERS_AKTIF_CACHE_KEY, 3600, function () {
+            return $this->userRepository->getUserByStatus('Aktif');
+        });
+    }
+
+    public function getInactiveUsers()
+    {
+        return Cache::remember(self::USERS_NONAKTIF_CACHE_KEY, 3600, function () {
+            return $this->userRepository->getUserByStatus('Non Aktif');
+        });
+    }
+
     public function createUser(array $data)
     {
-        try {
-            // Validasi data sebelum membuat user
-            $this->validateUserData($data);
+        $role = $data['role'] ?? null;
+        $user = $this->userRepository->createUser($data);
 
-            return $this->repository->createUser($data);
-        } catch (\Exception $e) {
-            Log::error("Error creating user: {$e->getMessage()}", ['exception' => $e, 'data' => $data]);
-            return null;
+        if ($user && $role) {
+            $user->assignRole($role);
         }
+
+        $this->clearUserCaches();
+        return $user;
     }
 
-    /**
-     * Memperbarui user berdasarkan ID.
-     *
-     * @param int $id The ID of the user.
-     * @param array $data The data to update the user with.
-     * @return mixed
-     */
     public function updateUser($id, array $data)
     {
-        try {
-            // Validasi data sebelum update
-            $this->validateUserData($data, $id);
+        $role = $data['role'] ?? null;
+        $user = $this->userRepository->updateUser($id, $data);
 
-            return $this->repository->updateUser($id, $data);
-        } catch (\Exception $e) {
-            Log::error("Error updating user with ID {$id}: {$e->getMessage()}", ['exception' => $e, 'data' => $data]);
-            return null;
+        if ($user && $role) {
+            $user->syncRoles([$role]);
         }
+        $this->clearUserCaches($id);
+        return $user;
     }
 
-    /**
-     * Menghapus user berdasarkan ID.
-     *
-     * @param int $id The ID of the user.
-     * @return mixed
-     */
     public function deleteUser($id)
     {
-        try {
-            return $this->repository->deleteUser($id);
-        } catch (\Exception $e) {
-            Log::error("Error deleting user with ID {$id}: {$e->getMessage()}", ['exception' => $e]);
-            return false;
-        }
+        $result = $this->userRepository->deleteUser($id);
+        $this->clearUserCaches($id);
+        return $result;
     }
 
-    /**
-     * Mengupdate status user.
-     *
-     * @param int $id The ID of the user.
-     * @param string $status New status value.
-     * @return mixed
-     */
     public function updateUserStatus($id, $status)
     {
-        try {
-            // Validasi status
-            $this->validateStatus($status);
+        $user = $this->getUserById($id);
 
-            return $this->repository->updateUserStatus($id, $status);
-        } catch (\Exception $e) {
-            Log::error("Error updating user status with ID {$id}: {$e->getMessage()}", ['exception' => $e, 'status' => $status]);
-            return null;
+        if ($user) {
+            $result = $this->userRepository->updateUserStatus($id, $status);
+            $this->clearUserCaches($id);
+            return $result;
         }
+
+        return null;
     }
 
-    /**
-     * Validasi data user.
-     *
-     * @param array $data
-     * @param int|null $userId
-     * @return void
-     * @throws \InvalidArgumentException
-     */
-    protected function validateUserData(array $data, $userId = null)
+    public function clearUserCaches($id = null)
     {
-        // Validasi email unik
-        if (isset($data['email'])) {
-            $query = User::where('email', $data['email']);
-            if ($userId) {
-                $query->where('id', '!=', $userId);
-            }
+        Cache::forget(self::USERS_ALL_CACHE_KEY);
+        Cache::forget(self::USERS_AKTIF_CACHE_KEY);
+        Cache::forget(self::USERS_NONAKTIF_CACHE_KEY);
 
-            if ($query->exists()) {
-                throw new \InvalidArgumentException('Email sudah digunakan.');
-            }
-        }
-
-        // Validasi username unik jika ada
-        if (isset($data['username'])) {
-            $query = User::where('username', $data['username']);
-            if ($userId) {
-                $query->where('id', '!=', $userId);
-            }
-
-            if ($query->exists()) {
-                throw new \InvalidArgumentException('Username sudah digunakan.');
-            }
-        }
-    }
-
-    /**
-     * Validasi status user.
-     *
-     * @param string $status
-     * @return void
-     * @throws \InvalidArgumentException
-     */
-    protected function validateStatus($status)
-    {
-        $validStatuses = ['active', 'inactive', 'suspended', 'pending'];
-
-        if (!in_array($status, $validStatuses)) {
-            throw new \InvalidArgumentException('Status tidak valid. Status yang diizinkan: ' . implode(', ', $validStatuses));
+        if ($id) {
+            Cache::forget("user_{$id}_with_roles");
         }
     }
 }
