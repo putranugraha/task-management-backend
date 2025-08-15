@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services\Contracts;
@@ -18,6 +19,14 @@ interface UserServiceInterface
      * @return mixed
      */
     public function getUserById($id);
+
+        /**
+     * Mengambil user berdasarkan nama.
+     *
+     * @param string $name
+     * @return mixed
+     */
+    public function getUserByName($name);
 
 
     /**

@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Repositories\Eloquent;
@@ -13,7 +14,7 @@ class UserRepository implements UserRepositoryInterface
      * @var User
      */
     protected $user;
-    
+
 
     /**
      * Konstruktor UserRepository.
@@ -49,6 +50,17 @@ class UserRepository implements UserRepositoryInterface
             Log::error("User with ID {$id} not found.");
             return null;
         }
+    }
+
+        /**
+     * Mengambil user berdasarkan nama.
+     *
+     * @param string $name
+     * @return mixed
+     */
+    public function getUserByName($name)
+    {
+        return $this->user->where('name', $name)->with('roles')->first();
     }
 
     /**

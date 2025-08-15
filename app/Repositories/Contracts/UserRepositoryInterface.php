@@ -19,6 +19,14 @@ interface UserRepositoryInterface
      */
     public function getUserById($id);
 
+        /**
+     * Mengambil user berdasarkan nama.
+     *
+     * @param string $name
+     * @return mixed
+     */
+    public function getUserByName($name);
+
     /**
      * Mengambil user berdasarkan status.
      *

@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services\Implementations;
@@ -29,6 +30,12 @@ class UserService implements UserServiceInterface
     public function getUserById($id)
     {
         return $this->userRepository->getUserById($id);
+        
+    }
+
+    public function getUserByName($name)
+    {
+        return $this->userRepository->getUserByName($name);
     }
 
     public function getUserByStatus($status)
