@@ -1,12 +1,11 @@
-
 <?php
 
 namespace App\Repositories\Eloquent;
 
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class UserRepository implements UserRepositoryInterface
 {
@@ -14,7 +13,6 @@ class UserRepository implements UserRepositoryInterface
      * @var User
      */
     protected $user;
-
 
     /**
      * Konstruktor UserRepository.
@@ -27,7 +25,7 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
-     * Mengambil semua users beserta relasi roles.
+     * Mengambil semua users.
      *
      * @return mixed
      */
@@ -37,7 +35,7 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
-     * Mengambil user berdasarkan ID beserta relasi roles.
+     * Mengambil user berdasarkan ID.
      *
      * @param int $id
      * @return mixed
@@ -45,6 +43,7 @@ class UserRepository implements UserRepositoryInterface
     public function getUserById($id)
     {
         try {
+            // Mengambil user berdasarkan ID beserta relasi roles
             return $this->user->with('roles')->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("User with ID {$id} not found.");
@@ -52,7 +51,7 @@ class UserRepository implements UserRepositoryInterface
         }
     }
 
-        /**
+    /**
      * Mengambil user berdasarkan nama.
      *
      * @param string $name
@@ -64,7 +63,7 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
-     * Mengambil user berdasarkan status beserta relasi roles.
+     * Mengambil user berdasarkan status.
      *
      * @param string $status
      * @return mixed
@@ -79,6 +78,26 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
+     * Mengambil semua users yang aktif.
+     *
+     * @return mixed
+     */
+    public function getActiveUsers()
+    {
+        return $this->getUserByStatus('Aktif');
+    }
+
+    /**
+     * Mengambil semua users yang tidak aktif.
+     *
+     * @return mixed
+     */
+    public function getInactiveUsers()
+    {
+        return $this->getUserByStatus('Non Aktif');
+    }
+
+    /**
      * Membuat user baru.
      *
      * @param array $data
@@ -87,8 +106,7 @@ class UserRepository implements UserRepositoryInterface
     public function createUser(array $data)
     {
         try {
-            $user = $this->user->create($data);
-            return $this->user->with('roles')->find($user->id);
+            return $this->user->create($data);
         } catch (\Exception $e) {
             Log::error("Failed to create user: {$e->getMessage()}");
             return null;
@@ -109,7 +127,7 @@ class UserRepository implements UserRepositoryInterface
         if ($user) {
             try {
                 $user->update($data);
-                return $this->user->with('roles')->find($user->id);
+                return $user;
             } catch (\Exception $e) {
                 Log::error("Failed to update user with ID {$id}: {$e->getMessage()}");
                 return null;
@@ -165,10 +183,6 @@ class UserRepository implements UserRepositoryInterface
      */
     public function updateUserStatus($id, $status)
     {
-        // Hanya izinkan status 'Aktif' dan 'Non Aktif'
-        if (!in_array($status, ['Aktif', 'Non Aktif'])) {
-            return null;
-        }
         $user = $this->findUser($id);
 
         if ($user) {

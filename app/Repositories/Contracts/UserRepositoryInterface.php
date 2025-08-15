@@ -33,7 +33,9 @@ interface UserRepositoryInterface
      * @param string $status
      * @return mixed
      */
+
     public function getUserByStatus($status);
+
 
 
 

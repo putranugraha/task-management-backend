@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Services\Contracts\UserServiceInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 
+
 class UserService implements UserServiceInterface
 {
     protected $userRepository;
@@ -50,14 +51,14 @@ class UserService implements UserServiceInterface
     public function getActiveUsers()
     {
         return Cache::remember(self::USERS_AKTIF_CACHE_KEY, 3600, function () {
-            return $this->userRepository->getUserByStatus('Aktif');
+            return $this->userRepository->getActiveUsers();
         });
     }
 
     public function getInactiveUsers()
     {
         return Cache::remember(self::USERS_NONAKTIF_CACHE_KEY, 3600, function () {
-            return $this->userRepository->getUserByStatus('Non Aktif');
+            return $this->userRepository->getInactiveUsers();
         });
     }
 
