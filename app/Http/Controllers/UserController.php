@@ -23,7 +23,7 @@ class UserController extends Controller
 
         if ($status === null) {
             $users = $this->userService->getAllUsers();
-        } elseif (in_array($status, ['Aktif', 'Non Aktif'])) {
+        } elseif (in_array($status, ['0', '1'])) {
             $users = $this->userService->getUserByStatus($status);
         } else {
             return response()->json(['error' => 'Invalid status parameter'], 400);

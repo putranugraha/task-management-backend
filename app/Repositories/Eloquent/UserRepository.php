@@ -13,6 +13,7 @@ class UserRepository implements UserRepositoryInterface
      * @var User
      */
     protected $user;
+    
 
     /**
      * Konstruktor UserRepository.

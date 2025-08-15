@@ -14,32 +14,23 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         // Admin user
-        $admin = User::firstOrCreate([
-            'email' => 'admin@example.com',
-        ], [
+        $admin = User::factory()->create([
             'name' => 'Admin',
-            'password' => bcrypt('password'),
-            'email_verified_at' => now(),
+            'email' => 'admin@example.com',
         ]);
         $admin->assignRole('Admin');
 
         // Manager user
-        $manager = User::firstOrCreate([
-            'email' => 'manager@example.com',
-        ], [
+        $manager = User::factory()->create([
             'name' => 'Manager',
-            'password' => bcrypt('password'),
-            'email_verified_at' => now(),
+            'email' => 'manager@example.com',
         ]);
         $manager->assignRole('Manager');
 
         // Member user
-        $member = User::firstOrCreate([
-            'email' => 'member@example.com',
-        ], [
+        $member = User::factory()->create([
             'name' => 'Member',
-            'password' => bcrypt('password'),
-            'email_verified_at' => now(),
+            'email' => 'member@example.com',
         ]);
         $member->assignRole('Member');
     }
