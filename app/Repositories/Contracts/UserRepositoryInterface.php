@@ -27,6 +27,8 @@ interface UserRepositoryInterface
      */
     public function getUserByStatus($status);
 
+
+
     /**
      * Membuat user baru.
      *

@@ -29,6 +29,20 @@ interface UserServiceInterface
     public function getUserByStatus($status);
 
     /**
+     * Mengambil semua users yang aktif.
+     *
+     * @return mixed
+     */
+    public function getActiveUsers();
+
+    /**
+     * Mengambil semua users yang tidak aktif.
+     *
+     * @return mixed
+     */
+    public function getInactiveUsers();
+
+    /**
      * Membuat user baru.
      *
      * @param array $data The data for the new user.

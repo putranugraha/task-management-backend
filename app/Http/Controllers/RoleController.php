@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-
 use App\Http\Requests\RoleStoreRequest;
 use App\Http\Requests\RoleUpdateRequest;
 use App\Http\Resources\RoleResource;
@@ -11,6 +10,12 @@ use App\Services\Contracts\RoleServiceInterface;
 
 class RoleController extends Controller
 {
+    /**
+     * Get the middleware the controller should use.
+     *
+     * @return array
+     */
+
     /**
      * @var RoleServiceInterface $roleService
      */
@@ -29,13 +34,17 @@ class RoleController extends Controller
      */
     public function index(Request $request)
     {
+        // Ambil parameter status dari query string
         $status = $request->query('status');
 
         if ($status === null) {
+            // Jika tidak ada query parameter, ambil semua role
             $roles = $this->roleService->getAllRoles();
-        } elseif ($status === 'Aktif') {
+        } elseif ($status == 1) {
+            // Jika status = 1, ambil role dengan status aktif
             $roles = $this->roleService->getActiveRoles();
-        } elseif ($status === 'Non Aktif') {
+        } elseif ($status == 0) {
+            // Jika status = 0 ambil role dengan status tidak aktif
             $roles = $this->roleService->getInactiveRoles();
         } else {
             return response()->json(['error' => 'Invalid status parameter'], 400);
@@ -53,15 +62,11 @@ class RoleController extends Controller
      */
     public function store(RoleStoreRequest $request)
     {
-        try {
-            $role = $this->roleService->createRole($request->all());
-            if (!$role) {
-                return response()->json(['message' => 'Gagal membuat role'], 400);
-            }
-            return new RoleResource($role);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
+        $role = $this->roleService->createRole($request->all());
+        if (!$role) {
+            return response()->json(['message' => 'Gagal membuat role'], 400);
         }
+        return new RoleResource($role);
     }
 
     /**
@@ -81,15 +86,11 @@ class RoleController extends Controller
      */
     public function update(RoleUpdateRequest $request, string $id)
     {
-        try {
-            $role = $this->roleService->updateRole($id, $request->all());
-            if (!$role) {
-                return response()->json(['message' => 'Role tidak ditemukan'], 404);
-            }
-            return new RoleResource($role);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
+        $role = $this->roleService->updateRole($id, $request->all());
+        if (!$role) {
+            return response()->json(['message' => 'Role tidak ditemukan'], 404);
         }
+        return new RoleResource($role);
     }
 
     /**
@@ -97,15 +98,13 @@ class RoleController extends Controller
      */
     public function destroy(string $id)
     {
-        try {
-            $deleted = $this->roleService->deleteRole($id);
-            if (!$deleted) {
-                return response()->json(['message' => 'Role tidak ditemukan'], 404);
-            }
-            return response()->json(['message' => 'Role berhasil dihapus'], 200);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
+        $deleted = $this->roleService->deleteRole($id);
+
+        if (!$deleted) {
+            return response()->json(['message' => 'Role tidak ditemukan'], 404);
         }
+
+        return response()->json(['message' => 'Role berhasil dihapus'], 200);
     }
 
     /**
@@ -117,8 +116,7 @@ class RoleController extends Controller
             'status' => 'required|in:Aktif,Non Aktif',
         ]);
 
-        $status = $request->input('status');
-        $role = $this->roleService->updateRoleStatus($id, $status);
+        $role = $this->roleService->updateRoleStatus($id, $request->validated());
 
         if (!$role) {
             return response()->json(['message' => 'Failed to update role status'], 404);
