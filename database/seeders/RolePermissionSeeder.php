@@ -9,48 +9,51 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
-	/**
-	 * Run the database seeds.
-	 */
-	public function run(): void
-	{
-		// Reset cached roles and permissions
-		app()[PermissionRegistrar::class]->forgetCachedPermissions();
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        // Reset cached roles and permissions
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-		// Permissions for task management
-		$permissions = [
-			'mengelola user',
-			'mengelola role',
-			'mengelola project',
-			'mengelola tugas',
-			'melihat project',
-			'melihat tugas',
-			'mencetak laporan',
-		];
+        // Permissions aligned with project (pluralized where applicable)
+        $permissions = [
+            'mengelola users',
+            'mengelola roles',
+            'mengelola permissions',
+            'mengelola project',
+            'mengelola tugas',
+            'melihat project',
+            'melihat tugas',
+            'mencetak laporan',
+        ];
 
-		foreach ($permissions as $permission) {
-			Permission::firstOrCreate(['name' => $permission]);
-		}
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+        }
 
-		// Admin: semua permission
-		$admin = Role::firstOrCreate(['name' => 'Admin']);
-		$admin->syncPermissions($permissions);
+        // Roles kept as in this project
+        $admin = Role::firstOrCreate(['name' => 'Admin']);
+        $manager = Role::firstOrCreate(['name' => 'Manager']);
+        $member = Role::firstOrCreate(['name' => 'Member']);
 
-		// Manager: tidak bisa kelola user/role
-		$manager = Role::firstOrCreate(['name' => 'Manager']);
-		$manager->syncPermissions([
-			'mengelola project',
-			'mengelola tugas',
-			'melihat project',
-			'melihat tugas',
-			'mencetak laporan',
-		]);
+        // Admin: all permissions
+        $admin->syncPermissions(Permission::all());
 
-		// Member: hanya bisa lihat project & tugas
-		$member = Role::firstOrCreate(['name' => 'Member']);
-		$member->syncPermissions([
-			'melihat project',
-			'melihat tugas',
-		]);
-	}
+        // Manager: all except managing users/roles/permissions
+        $managerDisallowed = [
+            'mengelola users',
+            'mengelola roles',
+            'mengelola permissions',
+        ];
+        $managerPermissions = Permission::whereNotIn('name', $managerDisallowed)->get();
+        $manager->syncPermissions($managerPermissions);
+
+        // Member: read-only access
+        $member->syncPermissions([
+            Permission::where('name', 'melihat project')->first(),
+            Permission::where('name', 'melihat tugas')->first(),
+        ]);
+    }
 }

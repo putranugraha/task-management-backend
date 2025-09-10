@@ -19,6 +19,7 @@ class UserSeeder extends Seeder
             'email' => 'admin@example.com',
         ]);
         $admin->assignRole('Admin');
+        $admin->removeRole('Member'); // Remove default Member role
 
         // Manager user
         $manager = User::factory()->create([
@@ -26,6 +27,7 @@ class UserSeeder extends Seeder
             'email' => 'manager@example.com',
         ]);
         $manager->assignRole('Manager');
+        $manager->removeRole('Member'); // Remove default Member role
 
         // Member user
         $member = User::factory()->create([

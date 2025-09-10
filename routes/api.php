@@ -2,7 +2,46 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\PermissionController;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+// Public auth routes (throttled)
+Route::middleware(['throttle:6,1'])->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/register', [AuthController::class, 'register'])->name('register');
+    Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+});
+
+// Protected routes (Sanctum)
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
+    // Profile
+    Route::get('/profile', function (Request $request) {
+        $user = $request->user();
+        return response()->json([
+            'user' => $user, // Optionally wrap with Resource
+            'roles' => $user->getRoleNames(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+        ]);
+    });
+
+    // Logout current token
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
+
+// Users API (Resource) protected by Sanctum + Permission
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola users'])->group(function () {
+    Route::apiResource('users', UserController::class);
+});
+
+// Roles API
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola roles'])->group(function () {
+    Route::apiResource('roles', RoleController::class)->only(['index','store','show','update','destroy']);
+});
+
+// Permissions API
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola permissions'])->group(function () {
+    Route::apiResource('permissions', PermissionController::class)->only(['index','store','show','update','destroy']);
+});
