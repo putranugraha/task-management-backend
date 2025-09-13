@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ProjectController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -44,4 +45,16 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola roles'])->gro
 // Permissions API
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola permissions'])->group(function () {
     Route::apiResource('permissions', PermissionController::class)->only(['index','store','show','update','destroy']);
+});
+
+// Projects API as apiResource
+// Read-only for those with 'melihat project'
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('projects', ProjectController::class)->only(['index','show']);
+});
+
+// Management for those with 'mengelola project'
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('projects', ProjectController::class)->only(['store','update','destroy']);
+    Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
