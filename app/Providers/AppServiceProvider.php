@@ -7,6 +7,10 @@ use App\Repositories\Contracts\ProjectRepositoryInterface;
 use App\Repositories\Eloquent\ProjectRepository;
 use App\Services\Contracts\ProjectServiceInterface;
 use App\Services\Implementations\ProjectService;
+use App\Repositories\Contracts\MilestoneRepositoryInterface;
+use App\Repositories\Eloquent\MilestoneRepository;
+use App\Services\Contracts\MilestoneServiceInterface;
+use App\Services\Implementations\MilestoneService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,6 +22,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind Project interfaces to implementations
         $this->app->bind(ProjectRepositoryInterface::class, ProjectRepository::class);
         $this->app->bind(ProjectServiceInterface::class, ProjectService::class);
+        // Bind Milestone interfaces to implementations
+        $this->app->bind(MilestoneRepositoryInterface::class, MilestoneRepository::class);
+        $this->app->bind(MilestoneServiceInterface::class, MilestoneService::class);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\MilestoneController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -58,3 +59,17 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::apiResource('projects', ProjectController::class)->only(['store','update','destroy']);
     Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
+
+// Milestones API as apiResource
+// Read-only for those with 'melihat project'
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('milestones', MilestoneController::class)->only(['index','show']);
+});
+
+// Manage milestones with 'mengelola project'
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('milestones', MilestoneController::class)->only(['store','update','destroy']);
+    Route::patch('milestones/{milestone}/status', [MilestoneController::class, 'updateStatus']);
+    Route::patch('milestones/{milestone}/complete', [MilestoneController::class, 'complete']);
+});
+
