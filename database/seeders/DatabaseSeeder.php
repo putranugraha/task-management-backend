@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             ProjectSeeder::class,
             MilestoneSeeder::class,
             TaskSeeder::class,
+            TaskDependencySeeder::class,
 
         ]);
 

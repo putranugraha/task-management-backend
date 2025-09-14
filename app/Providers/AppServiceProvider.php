@@ -15,6 +15,10 @@ use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Repositories\Eloquent\TaskRepository;
 use App\Services\Contracts\TaskServiceInterface;
 use App\Services\Implementations\TaskService;
+use App\Repositories\Contracts\TaskDependencyRepositoryInterface;
+use App\Repositories\Eloquent\TaskDependencyRepository;
+use App\Services\Contracts\TaskDependencyServiceInterface;
+use App\Services\Implementations\TaskDependencyService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,6 +36,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind Task interfaces to implementations
         $this->app->bind(TaskRepositoryInterface::class, TaskRepository::class);
         $this->app->bind(TaskServiceInterface::class, TaskService::class);
+        // Bind TaskDependency interfaces to implementations
+        $this->app->bind(TaskDependencyRepositoryInterface::class, TaskDependencyRepository::class);
+        $this->app->bind(TaskDependencyServiceInterface::class, TaskDependencyService::class);
     }
 
     /**

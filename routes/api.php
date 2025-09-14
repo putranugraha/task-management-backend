@@ -9,6 +9,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskDependencyController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -86,4 +87,19 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus']);
     Route::patch('tasks/{task}/progress', [TaskController::class, 'updateProgress']);
     Route::patch('tasks/{task}/complete', [TaskController::class, 'complete']);
+});
+
+// Task Dependencies API
+// Read-only for those with 'melihat project'
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('task-dependencies', TaskDependencyController::class)->only(['index','show']);
+    // Convenience endpoints by task
+    Route::get('tasks/{task}/dependencies', [TaskDependencyController::class, 'index']); // use query task_id
+    Route::get('tasks/{task}/dependents', [TaskDependencyController::class, 'index']); // use query depends_on_task_id
+});
+
+// Manage dependencies with 'mengelola project'
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('task-dependencies', TaskDependencyController::class)->only(['store','update','destroy']);
+    Route::delete('tasks/{task}/dependencies', [TaskDependencyController::class, 'destroyByTask']);
 });
