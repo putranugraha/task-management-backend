@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ProjectSeeder::class,
             MilestoneSeeder::class,
+            TaskSeeder::class,
 
         ]);
 
