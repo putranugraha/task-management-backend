@@ -8,6 +8,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\MilestoneController;
+use App\Http\Controllers\TaskController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -73,3 +74,16 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::patch('milestones/{milestone}/complete', [MilestoneController::class, 'complete']);
 });
 
+// Tasks API as apiResource
+// Read-only for those with 'melihat project'
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('tasks', TaskController::class)->only(['index','show']);
+});
+
+// Manage tasks with 'mengelola project'
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('tasks', TaskController::class)->only(['store','update','destroy']);
+    Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus']);
+    Route::patch('tasks/{task}/progress', [TaskController::class, 'updateProgress']);
+    Route::patch('tasks/{task}/complete', [TaskController::class, 'complete']);
+});

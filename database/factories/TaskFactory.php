@@ -25,8 +25,8 @@ class TaskFactory extends Factory
         $actualDays = $hasActual ? fake()->numberBetween(max(1, $plannedDays - 5), $plannedDays + 10) : null;
         $endActual = $hasActual ? (clone $startActual)->modify("+{$actualDays} days") : null;
 
-        $status = fake()->randomElement(['Planned', 'In Progress', 'Completed', 'On Hold', 'Cancelled']);
-        $percent = $status === 'Completed' ? 100 : ($hasActual ? fake()->numberBetween(10, 95) : fake()->numberBetween(0, 60));
+        $status = fake()->randomElement(['To Do', 'In Progress', 'Done', 'On Hold', 'Cancelled']);
+        $percent = $status === 'Done' ? 100 : ($hasActual ? fake()->numberBetween(10, 95) : fake()->numberBetween(0, 60));
 
         return [
             'project_id' => Project::factory(),
@@ -44,4 +44,3 @@ class TaskFactory extends Factory
         ];
     }
 }
-

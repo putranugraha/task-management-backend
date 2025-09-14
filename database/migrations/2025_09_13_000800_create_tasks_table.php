@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('priority', 20)->default('Medium');
-            $table->string('status', 50)->default('Planned');
+            $table->string('status', 50)->default('To Do');
             $table->date('start_planned')->nullable();
             $table->date('end_planned')->nullable();
             $table->unsignedInteger('duration_planned')->nullable();
@@ -37,4 +37,3 @@ return new class extends Migration
         Schema::dropIfExists('tasks');
     }
 };
-
