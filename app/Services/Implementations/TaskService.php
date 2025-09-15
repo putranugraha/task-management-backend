@@ -5,6 +5,8 @@ namespace App\Services\Implementations;
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use App\Models\StatusHistory;
+use Illuminate\Support\Facades\Auth;
 
 class TaskService implements TaskServiceInterface
 {
@@ -91,8 +93,18 @@ class TaskService implements TaskServiceInterface
     public function updateTaskStatus($id, $status)
     {
         if (!in_array($status, self::ALLOWED_STATUSES)) return null;
+        $before = $this->getTaskById($id);
         $task = $this->repository->updateTaskStatus($id, $status);
         $this->clearCaches($id, $status, $task->project_id ?? null, $task->priority ?? null);
+        if ($task) {
+            StatusHistory::create([
+                'task_id' => $task->id,
+                'from_status' => $before->status ?? null,
+                'to_status' => $task->status,
+                'changed_by' => Auth::id(),
+                'note' => null,
+            ]);
+        }
         return $task;
     }
 
@@ -106,8 +118,18 @@ class TaskService implements TaskServiceInterface
 
     public function completeTask($id)
     {
+        $before = $this->getTaskById($id);
         $task = $this->repository->completeTask($id);
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null);
+        if ($task) {
+            StatusHistory::create([
+                'task_id' => $task->id,
+                'from_status' => $before->status ?? null,
+                'to_status' => $task->status,
+                'changed_by' => Auth::id(),
+                'note' => 'Completed via action',
+            ]);
+        }
         return $task;
     }
 

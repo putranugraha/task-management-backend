@@ -11,6 +11,7 @@ use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskAssignmentController;
+use App\Http\Controllers\StatusHistoryController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -118,4 +119,17 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::apiResource('task-assignments', TaskAssignmentController::class)->only(['store','update','destroy']);
     Route::delete('tasks/{task}/assignments', [TaskAssignmentController::class, 'destroyByTask']);
     Route::delete('users/{user}/assignments', [TaskAssignmentController::class, 'destroyByUser']);
+});
+
+// Status Histories API
+// Read-only
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('status-histories', StatusHistoryController::class)->only(['index','show']);
+    Route::get('tasks/{task}/status-histories', [StatusHistoryController::class, 'index']);
+});
+
+// Manage histories
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('status-histories', StatusHistoryController::class)->only(['store','destroy']);
+    Route::delete('status-histories/by-entity', [StatusHistoryController::class, 'destroyByEntity']);
 });

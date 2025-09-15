@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             TaskSeeder::class,
             TaskDependencySeeder::class,
             TaskAssignmentSeeder::class,
+            StatusHistorySeeder::class,
 
         ]);
 

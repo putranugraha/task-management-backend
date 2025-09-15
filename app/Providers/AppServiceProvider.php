@@ -23,6 +23,10 @@ use App\Repositories\Contracts\TaskAssignmentRepositoryInterface;
 use App\Repositories\Eloquent\TaskAssignmentRepository;
 use App\Services\Contracts\TaskAssignmentServiceInterface;
 use App\Services\Implementations\TaskAssignmentService;
+use App\Repositories\Contracts\StatusHistoryRepositoryInterface;
+use App\Repositories\Eloquent\StatusHistoryRepository;
+use App\Services\Contracts\StatusHistoryServiceInterface;
+use App\Services\Implementations\StatusHistoryService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,6 +50,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind TaskAssignment interfaces to implementations
         $this->app->bind(TaskAssignmentRepositoryInterface::class, TaskAssignmentRepository::class);
         $this->app->bind(TaskAssignmentServiceInterface::class, TaskAssignmentService::class);
+        // Bind StatusHistory interfaces to implementations
+        $this->app->bind(StatusHistoryRepositoryInterface::class, StatusHistoryRepository::class);
+        $this->app->bind(StatusHistoryServiceInterface::class, StatusHistoryService::class);
     }
 
     /**

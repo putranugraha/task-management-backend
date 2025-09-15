@@ -61,4 +61,9 @@ class Task extends Model
     {
         return $this->hasMany(TaskDependency::class, 'depends_on_task_id')->with('task');
     }
+
+    public function statusHistories()
+    {
+        return $this->hasMany(StatusHistory::class)->latest('id');
+    }
 }
