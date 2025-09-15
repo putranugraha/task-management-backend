@@ -13,6 +13,7 @@ use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskAssignmentController;
 use App\Http\Controllers\StatusHistoryController;
 use App\Http\Controllers\TimeEntryController;
+use App\Http\Controllers\CommentController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -148,4 +149,22 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 // Manage time entries
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('time-entries', TimeEntryController::class)->only(['store','update','destroy']);
+});
+
+// Comments API
+// Read-only
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('comments', CommentController::class)->only(['index','show']);
+    // Aliases per entity
+    Route::get('tasks/{task}/comments', [CommentController::class, 'index']);
+    Route::get('projects/{project}/comments', [CommentController::class, 'index']);
+    Route::get('milestones/{milestone}/comments', [CommentController::class, 'index']);
+    // Count per entity
+    Route::get('comments/count', [CommentController::class, 'countByEntity']);
+});
+
+// Manage comments
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('comments', CommentController::class)->only(['store','update','destroy']);
+    Route::delete('comments/by-entity', [CommentController::class, 'destroyByEntity']);
 });

@@ -31,6 +31,10 @@ use App\Repositories\Contracts\TimeEntryRepositoryInterface;
 use App\Repositories\Eloquent\TimeEntryRepository;
 use App\Services\Contracts\TimeEntryServiceInterface;
 use App\Services\Implementations\TimeEntryService;
+use App\Repositories\Contracts\CommentRepositoryInterface;
+use App\Repositories\Eloquent\CommentRepository;
+use App\Services\Contracts\CommentServiceInterface;
+use App\Services\Implementations\CommentService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -60,6 +64,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind TimeEntry interfaces to implementations
         $this->app->bind(TimeEntryRepositoryInterface::class, TimeEntryRepository::class);
         $this->app->bind(TimeEntryServiceInterface::class, TimeEntryService::class);
+        // Bind Comment interfaces to implementations
+        $this->app->bind(CommentRepositoryInterface::class, CommentRepository::class);
+        $this->app->bind(CommentServiceInterface::class, CommentService::class);
     }
 
     /**
