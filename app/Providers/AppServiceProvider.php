@@ -27,6 +27,10 @@ use App\Repositories\Contracts\StatusHistoryRepositoryInterface;
 use App\Repositories\Eloquent\StatusHistoryRepository;
 use App\Services\Contracts\StatusHistoryServiceInterface;
 use App\Services\Implementations\StatusHistoryService;
+use App\Repositories\Contracts\TimeEntryRepositoryInterface;
+use App\Repositories\Eloquent\TimeEntryRepository;
+use App\Services\Contracts\TimeEntryServiceInterface;
+use App\Services\Implementations\TimeEntryService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -53,6 +57,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind StatusHistory interfaces to implementations
         $this->app->bind(StatusHistoryRepositoryInterface::class, StatusHistoryRepository::class);
         $this->app->bind(StatusHistoryServiceInterface::class, StatusHistoryService::class);
+        // Bind TimeEntry interfaces to implementations
+        $this->app->bind(TimeEntryRepositoryInterface::class, TimeEntryRepository::class);
+        $this->app->bind(TimeEntryServiceInterface::class, TimeEntryService::class);
     }
 
     /**

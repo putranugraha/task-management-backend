@@ -12,6 +12,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskAssignmentController;
 use App\Http\Controllers\StatusHistoryController;
+use App\Http\Controllers\TimeEntryController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -132,4 +133,19 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('status-histories', StatusHistoryController::class)->only(['store','destroy']);
     Route::delete('status-histories/by-entity', [StatusHistoryController::class, 'destroyByEntity']);
+});
+
+// Time Entries API
+// Read-only
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('time-entries', TimeEntryController::class)->only(['index','show']);
+    Route::get('tasks/{task}/time-entries', [TimeEntryController::class, 'index']);
+    Route::get('users/{user}/time-entries', [TimeEntryController::class, 'index']);
+    Route::get('tasks/{task}/time-entries/total-hours', [TimeEntryController::class, 'totalHoursByTask']);
+    Route::get('users/{user}/time-entries/total-hours', [TimeEntryController::class, 'totalHoursByUser']);
+});
+
+// Manage time entries
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('time-entries', TimeEntryController::class)->only(['store','update','destroy']);
 });
