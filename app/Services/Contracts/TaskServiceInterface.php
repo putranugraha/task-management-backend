@@ -11,6 +11,7 @@ interface TaskServiceInterface
     public function getTasksByPriority($priority);
     public function getTasksByPlannedDateRange($startDate, $endDate);
     public function getTasksByActualDateRange($startDate, $endDate);
+    public function getTasksByDependsOnTask($dependsOnTaskId);
     public function createTask(array $data);
     public function updateTask($id, array $data);
     public function deleteTask($id);
@@ -18,4 +19,3 @@ interface TaskServiceInterface
     public function updateTaskProgress($id, $percent);
     public function completeTask($id);
 }
-

@@ -61,6 +61,11 @@ class TaskService implements TaskServiceInterface
         return $this->repository->getTasksByActualDateRange($startDate, $endDate);
     }
 
+    public function getTasksByDependsOnTask($dependsOnTaskId)
+    {
+        return $this->repository->getTasksByDependsOnTask($dependsOnTaskId);
+    }
+
     public function createTask(array $data)
     {
         $task = $this->repository->createTask($data);
@@ -115,4 +120,3 @@ class TaskService implements TaskServiceInterface
         if ($priority) Cache::forget(self::CACHE_PRIORITY_PREFIX.$priority);
     }
 }
-

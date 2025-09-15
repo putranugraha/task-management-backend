@@ -29,9 +29,39 @@ class TaskResource extends JsonResource
                     'name' => $this->project->name,
                 ];
             }),
+            'dependencies' => $this->whenLoaded('dependencies', function () use ($request) {
+                $deps = $this->dependencies;
+                $filterDependsOn = $request->query('depends_on_task_id');
+                if ($filterDependsOn !== null) {
+                    $deps = $deps->where('depends_on_task_id', (int) $filterDependsOn);
+                }
+                return $deps->map(function ($dep) {
+                    return [
+                        'id' => $dep->id,
+                        'type' => $dep->type,
+                        'lag_days' => $dep->lag_days,
+                        'depends_on' => [
+                            'id' => $dep->dependsOn->id ?? null,
+                            'title' => $dep->dependsOn->title ?? null,
+                        ],
+                    ];
+                });
+            }),
+            'dependents' => $this->whenLoaded('dependents', function () {
+                return $this->dependents->map(function ($dep) {
+                    return [
+                        'id' => $dep->id,
+                        'type' => $dep->type,
+                        'lag_days' => $dep->lag_days,
+                        'task' => [
+                            'id' => $dep->task->id ?? null,
+                            'title' => $dep->task->title ?? null,
+                        ],
+                    ];
+                });
+            }),
             'created_at' => optional($this->created_at)->toDateTimeString(),
             'updated_at' => optional($this->updated_at)->toDateTimeString(),
         ];
     }
 }
-

@@ -24,9 +24,9 @@ class TaskDependencyController extends Controller
         $taskId = $request->query('task_id', is_scalar($routeTask) ? $routeTask : null);
         $dependsOnTaskId = $request->query('depends_on_task_id', is_scalar($routeTask) ? $routeTask : null);
 
-        if ($request->routeIs('*dependencies') && $taskId) {
+        if (($request->routeIs('*dependencies') && $taskId) || ($taskId && !$request->routeIs('*dependents'))) {
             $deps = $this->service->getDependenciesByTask($taskId);
-        } elseif ($request->routeIs('*dependents') && $dependsOnTaskId) {
+        } elseif (($request->routeIs('*dependents') && $dependsOnTaskId) || ($dependsOnTaskId && !$request->routeIs('*dependencies'))) {
             $deps = $this->service->getDependentsByTask($dependsOnTaskId);
         } else {
             $deps = $this->service->getAllDependencies();

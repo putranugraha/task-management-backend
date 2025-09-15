@@ -51,5 +51,14 @@ class Task extends Model
     {
         return $this->belongsTo(Project::class);
     }
-}
 
+    public function dependencies()
+    {
+        return $this->hasMany(TaskDependency::class, 'task_id')->with('dependsOn');
+    }
+
+    public function dependents()
+    {
+        return $this->hasMany(TaskDependency::class, 'depends_on_task_id')->with('task');
+    }
+}

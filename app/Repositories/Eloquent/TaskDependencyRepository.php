@@ -33,12 +33,18 @@ class TaskDependencyRepository implements TaskDependencyRepositoryInterface
 
     public function getDependenciesByTask($taskId)
     {
-        return $this->model->where('task_id', $taskId)->with('dependsOn')->get();
+        return $this->model
+            ->where('task_id', $taskId)
+            ->with(['task', 'dependsOn'])
+            ->get();
     }
 
     public function getDependentsByTask($dependsOnTaskId)
     {
-        return $this->model->where('depends_on_task_id', $dependsOnTaskId)->with('task')->get();
+        return $this->model
+            ->where('depends_on_task_id', $dependsOnTaskId)
+            ->with(['task', 'dependsOn'])
+            ->get();
     }
 
     public function createDependency(array $data)
@@ -99,4 +105,3 @@ class TaskDependencyRepository implements TaskDependencyRepositoryInterface
         }
     }
 }
-

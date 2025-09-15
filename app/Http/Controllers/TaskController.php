@@ -27,6 +27,8 @@ class TaskController extends Controller
         $endPlanned = $request->query('end_planned');
         $startActual = $request->query('start_actual');
         $endActual = $request->query('end_actual');
+        $dependsOnTaskId = $request->query('depends_on_task_id');
+        $include = $request->query('include'); // e.g., "dependencies,dependents,project"
 
         if ($projectId) {
             $tasks = $this->service->getTasksByProject($projectId);
@@ -34,12 +36,33 @@ class TaskController extends Controller
             $tasks = $this->service->getTasksByStatus($status);
         } elseif ($priority) {
             $tasks = $this->service->getTasksByPriority($priority);
+        } elseif ($dependsOnTaskId) {
+            $tasks = $this->service->getTasksByDependsOnTask($dependsOnTaskId);
         } elseif ($startPlanned && $endPlanned) {
             $tasks = $this->service->getTasksByPlannedDateRange($startPlanned, $endPlanned);
         } elseif ($startActual && $endActual) {
             $tasks = $this->service->getTasksByActualDateRange($startActual, $endActual);
         } else {
             $tasks = $this->service->getAllTasks();
+        }
+
+        // Eager-load optional includes for clarity in responses
+        if ($include) {
+            $map = [
+                'project' => 'project',
+                'dependencies' => 'dependencies.dependsOn',
+                'dependents' => 'dependents.task',
+            ];
+            $rels = collect(explode(',', $include))
+                ->map(fn($s) => trim($s))
+                ->filter()
+                ->map(fn($key) => $map[$key] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+            if (!empty($rels) && method_exists($tasks, 'load')) {
+                $tasks->load($rels);
+            }
         }
 
         return TaskResource::collection($tasks);
@@ -100,4 +123,3 @@ class TaskController extends Controller
         return new TaskResource($task);
     }
 }
-

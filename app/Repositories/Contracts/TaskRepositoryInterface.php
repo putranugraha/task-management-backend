@@ -42,4 +42,7 @@ interface TaskRepositoryInterface
 
     /** Tandai task selesai (set status = Done, end_actual = now, percent_complete = 100). */
     public function completeTask($id);
+
+    /** Ambil semua task yang bergantung pada task tertentu (depends_on_task_id). */
+    public function getTasksByDependsOnTask($dependsOnTaskId);
 }

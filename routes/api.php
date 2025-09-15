@@ -10,6 +10,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
+use App\Http\Controllers\TaskAssignmentController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -102,4 +103,19 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('task-dependencies', TaskDependencyController::class)->only(['store','update','destroy']);
     Route::delete('tasks/{task}/dependencies', [TaskDependencyController::class, 'destroyByTask']);
+});
+
+// Task Assignments API
+// Read-only
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('task-assignments', TaskAssignmentController::class)->only(['index','show']);
+    Route::get('tasks/{task}/assignments', [TaskAssignmentController::class, 'index']);
+    Route::get('users/{user}/assignments', [TaskAssignmentController::class, 'index']);
+});
+
+// Manage assignments
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('task-assignments', TaskAssignmentController::class)->only(['store','update','destroy']);
+    Route::delete('tasks/{task}/assignments', [TaskAssignmentController::class, 'destroyByTask']);
+    Route::delete('users/{user}/assignments', [TaskAssignmentController::class, 'destroyByUser']);
 });

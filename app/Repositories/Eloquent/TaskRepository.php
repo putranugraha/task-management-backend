@@ -140,6 +140,16 @@ class TaskRepository implements TaskRepositoryInterface
         return $task->fresh('project');
     }
 
+    public function getTasksByDependsOnTask($dependsOnTaskId)
+    {
+        return $this->model
+            ->whereHas('dependencies', function ($q) use ($dependsOnTaskId) {
+                $q->where('depends_on_task_id', $dependsOnTaskId);
+            })
+            ->with(['project', 'dependencies.dependsOn'])
+            ->get();
+    }
+
     protected function find($id)
     {
         try {
