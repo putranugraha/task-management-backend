@@ -3,6 +3,11 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use App\Models\Task;
+use App\Models\Project;
+use App\Models\Milestone;
+use App\Models\User;
 use App\Repositories\Contracts\ProjectRepositoryInterface;
 use App\Repositories\Eloquent\ProjectRepository;
 use App\Services\Contracts\ProjectServiceInterface;
@@ -81,6 +86,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Enforce morph map so polymorphic types use stable aliases
+        Relation::enforceMorphMap([
+            'Task' => Task::class,
+            'Project' => Project::class,
+            'Milestone' => Milestone::class,
+            'User' => User::class,
+        ]);
     }
 }

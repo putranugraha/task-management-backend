@@ -18,17 +18,18 @@ class CommentFactory extends Factory
 
     public function definition(): array
     {
-        $types = [Task::class, Project::class, Milestone::class];
-        $type = fake()->randomElement($types);
+        // Use morph map aliases for entity_type for consistency
+        $aliases = ['Task', 'Project', 'Milestone'];
+        $alias = fake()->randomElement($aliases);
 
-        $entityFactory = match ($type) {
-            Task::class => Task::factory(),
-            Project::class => Project::factory(),
-            Milestone::class => Milestone::factory(),
+        $entityFactory = match ($alias) {
+            'Task' => Task::factory(),
+            'Project' => Project::factory(),
+            'Milestone' => Milestone::factory(),
         };
 
         return [
-            'entity_type' => $type,
+            'entity_type' => $alias,
             'entity_id' => $entityFactory,
             'user_id' => User::factory(),
             'content' => fake()->sentences(fake()->numberBetween(1, 3), true),
@@ -37,4 +38,3 @@ class CommentFactory extends Factory
         ];
     }
 }
-

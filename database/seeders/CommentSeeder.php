@@ -53,9 +53,9 @@ class CommentSeeder extends Seeder
             }
         };
 
-        $makeComments($projects, \App\Models\Project::class);
-        $makeComments($tasks, \App\Models\Task::class);
-        $makeComments($milestones, \App\Models\Milestone::class);
+        // Use morph map aliases instead of FQCN for entity_type
+        $makeComments($projects, 'Project');
+        $makeComments($tasks, 'Task');
+        $makeComments($milestones, 'Milestone');
     }
 }
-

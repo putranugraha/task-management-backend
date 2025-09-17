@@ -69,9 +69,9 @@ class AttachmentSeeder extends Seeder
             }
         };
 
-        $seedFor($projects, \App\Models\Project::class);
-        $seedFor($tasks, \App\Models\Task::class);
-        $seedFor($milestones, \App\Models\Milestone::class);
+        // Use morph map aliases instead of FQCN for entity_type
+        $seedFor($projects, 'Project');
+        $seedFor($tasks, 'Task');
+        $seedFor($milestones, 'Milestone');
     }
 }
-
