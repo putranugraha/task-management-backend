@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\TaskController;
@@ -55,6 +56,18 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola permissions']
     Route::apiResource('permissions', PermissionController::class)->only(['index','store','show','update','destroy']);
 });
 
+
+// Divisions API
+// Read-only for those with 'melihat project'
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('divisions', DivisionController::class)->only(['index','show']);
+    Route::get('divisions/{division}/users-count', [DivisionController::class, 'usersCount']);
+});
+
+// Manage divisions with 'mengelola project'
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('divisions', DivisionController::class)->only(['store','update','destroy']);
+});
 // Projects API as apiResource
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {

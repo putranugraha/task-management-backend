@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -23,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'division_id',
         'status',
     ];
 
@@ -35,6 +35,11 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    public function division()
+    {
+        return $this->belongsTo(Division::class);
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -49,3 +54,4 @@ class User extends Authenticatable
         ];
     }
 }
+

@@ -8,6 +8,10 @@ use App\Models\Task;
 use App\Models\Project;
 use App\Models\Milestone;
 use App\Models\User;
+use App\Repositories\Contracts\DivisionRepositoryInterface;
+use App\Repositories\Eloquent\DivisionRepository;
+use App\Services\Contracts\DivisionServiceInterface;
+use App\Services\Implementations\DivisionService;
 use App\Repositories\Contracts\ProjectRepositoryInterface;
 use App\Repositories\Eloquent\ProjectRepository;
 use App\Services\Contracts\ProjectServiceInterface;
@@ -52,6 +56,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Bind Division interfaces to implementations
+        $this->app->bind(DivisionRepositoryInterface::class, DivisionRepository::class);
+        $this->app->bind(DivisionServiceInterface::class, DivisionService::class);
+
         // Bind Project interfaces to implementations
         $this->app->bind(ProjectRepositoryInterface::class, ProjectRepository::class);
         $this->app->bind(ProjectServiceInterface::class, ProjectService::class);
@@ -95,3 +103,4 @@ class AppServiceProvider extends ServiceProvider
         ]);
     }
 }
+

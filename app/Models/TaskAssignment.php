@@ -19,7 +19,7 @@ class TaskAssignment extends Model
 
     protected function casts(): array
     {
-        return [
+        return [ 
             'estimated_effort_hours' => 'integer',
             'assigned_at' => 'datetime',
         ];
