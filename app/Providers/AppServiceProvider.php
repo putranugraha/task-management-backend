@@ -35,6 +35,10 @@ use App\Repositories\Contracts\CommentRepositoryInterface;
 use App\Repositories\Eloquent\CommentRepository;
 use App\Services\Contracts\CommentServiceInterface;
 use App\Services\Implementations\CommentService;
+use App\Repositories\Contracts\AttachmentRepositoryInterface;
+use App\Repositories\Eloquent\AttachmentRepository;
+use App\Services\Contracts\AttachmentServiceInterface;
+use App\Services\Implementations\AttachmentService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -67,6 +71,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind Comment interfaces to implementations
         $this->app->bind(CommentRepositoryInterface::class, CommentRepository::class);
         $this->app->bind(CommentServiceInterface::class, CommentService::class);
+        // Bind Attachment interfaces to implementations
+        $this->app->bind(AttachmentRepositoryInterface::class, AttachmentRepository::class);
+        $this->app->bind(AttachmentServiceInterface::class, AttachmentService::class);
     }
 
     /**

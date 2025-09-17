@@ -14,6 +14,7 @@ use App\Http\Controllers\TaskAssignmentController;
 use App\Http\Controllers\StatusHistoryController;
 use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\AttachmentController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -167,4 +168,20 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('comments', CommentController::class)->only(['store','update','destroy']);
     Route::delete('comments/by-entity', [CommentController::class, 'destroyByEntity']);
+});
+
+// Attachments API
+// Read-only
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::apiResource('attachments', AttachmentController::class)->only(['index','show']);
+    Route::get('tasks/{task}/attachments', [AttachmentController::class, 'index']);
+    Route::get('projects/{project}/attachments', [AttachmentController::class, 'index']);
+    Route::get('milestones/{milestone}/attachments', [AttachmentController::class, 'index']);
+    Route::get('attachments/total-size', [AttachmentController::class, 'totalSizeByEntity']);
+});
+
+// Manage attachments
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::apiResource('attachments', AttachmentController::class)->only(['store','update','destroy']);
+    Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });

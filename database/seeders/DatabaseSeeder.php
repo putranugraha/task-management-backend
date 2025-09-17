@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             StatusHistorySeeder::class,
             TimeEntrySeeder::class,
             CommentSeeder::class,
+            AttachmentSeeder::class,
 
         ]);
 
