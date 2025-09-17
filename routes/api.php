@@ -2,21 +2,22 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\RoleController;
-use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DivisionController;
-use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\ProjectBaselineController;
 use App\Http\Controllers\MilestoneController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ProjectBaselineController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\StatusHistoryController;
+use App\Http\Controllers\TaskAssignmentController;
+use App\Http\Controllers\TaskBaselineController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
-use App\Http\Controllers\TaskAssignmentController;
-use App\Http\Controllers\StatusHistoryController;
 use App\Http\Controllers\TimeEntryController;
-use App\Http\Controllers\CommentController;
-use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\UserController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -76,13 +77,19 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['index','show']);
     Route::get('projects/{project}/baselines', [ProjectBaselineController::class, 'index']);
     Route::get('projects/{project}/baselines/latest', [ProjectBaselineController::class, 'latest']);
+    Route::apiResource('task-baselines', TaskBaselineController::class)->only(['index','show']);
+    Route::get('project-baselines/{baseline}/task-baselines', [TaskBaselineController::class, 'index']);
+    Route::get('tasks/{task}/task-baselines', [TaskBaselineController::class, 'index']);
+    Route::get('project-baselines/{baseline}/task-baselines/total-weight', [TaskBaselineController::class, 'totalWeight']);
 });
 
 // Management for those with 'mengelola project'
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('projects', ProjectController::class)->only(['store','update','destroy']);
     Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['store','update','destroy']);
+    Route::apiResource('task-baselines', TaskBaselineController::class)->only(['store','update','destroy']);
     Route::delete('projects/{project}/baselines', [ProjectBaselineController::class, 'destroyByProject']);
+    Route::delete('project-baselines/{baseline}/task-baselines', [TaskBaselineController::class, 'destroyByBaseline']);
     Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
 
@@ -204,6 +211,15 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::apiResource('attachments', AttachmentController::class)->only(['store','update','destroy']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
+
+
+
+
+
+
+
+
+
 
 
 
