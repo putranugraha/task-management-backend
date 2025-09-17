@@ -47,5 +47,15 @@ class Project extends Model
     {
         return $this->belongsTo(User::class, 'division_owner_id');
     }
+
+    /**
+     * Baseline snapshots captured for the project.
+     */
+    public function baselines()
+    {
+        return $this->hasMany(ProjectBaseline::class);
+    }
 }
+
+
 

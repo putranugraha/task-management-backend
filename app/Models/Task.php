@@ -66,4 +66,13 @@ class Task extends Model
     {
         return $this->hasMany(StatusHistory::class)->latest('id');
     }
+
+    /**
+     * Baseline snapshots captured for this task across revisions.
+     */
+    public function baselines()
+    {
+        return $this->hasMany(TaskBaseline::class);
+    }
 }
+

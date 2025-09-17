@@ -1,0 +1,98 @@
+<?php
+
+namespace App\Services\Implementations;
+
+use App\Repositories\Contracts\ProjectBaselineRepositoryInterface;
+use App\Services\Contracts\ProjectBaselineServiceInterface;
+use Illuminate\Support\Facades\Cache;
+
+class ProjectBaselineService implements ProjectBaselineServiceInterface
+{
+    protected ProjectBaselineRepositoryInterface $repository;
+
+    const CACHE_ALL = 'project_baselines.all';
+    const CACHE_ID_PREFIX = 'project_baseline.'; // + id
+    const CACHE_PROJECT_PREFIX = 'project_baselines.project.'; // + projectId
+    const CACHE_LATEST_PREFIX = 'project_baselines.latest.'; // + projectId
+    const CACHE_DURATION = 1800; // 30 minutes
+
+    public function __construct(ProjectBaselineRepositoryInterface $repository)
+    {
+        $this->repository = $repository;
+    }
+
+    public function getAllBaselines()
+    {
+        return Cache::remember(self::CACHE_ALL, self::CACHE_DURATION, function () {
+            return $this->repository->getAllBaselines();
+        });
+    }
+
+    public function getBaselineById($id)
+    {
+        return Cache::remember(self::CACHE_ID_PREFIX.$id, self::CACHE_DURATION, function () use ($id) {
+            return $this->repository->getBaselineById($id);
+        });
+    }
+
+    public function getBaselinesByProject($projectId)
+    {
+        return Cache::remember(self::CACHE_PROJECT_PREFIX.$projectId, self::CACHE_DURATION, function () use ($projectId) {
+            return $this->repository->getBaselinesByProject($projectId);
+        });
+    }
+
+    public function getBaselineByName($projectId, $baselineName)
+    {
+        return $this->repository->getBaselineByName($projectId, $baselineName);
+    }
+
+    public function getLatestBaselineByProject($projectId)
+    {
+        return Cache::remember(self::CACHE_LATEST_PREFIX.$projectId, self::CACHE_DURATION, function () use ($projectId) {
+            return $this->repository->getLatestBaselineByProject($projectId);
+        });
+    }
+
+    public function createBaseline(array $data)
+    {
+        $baseline = $this->repository->createBaseline($data);
+        $this->clearCaches($baseline->id ?? null, $baseline->project_id ?? ($data['project_id'] ?? null));
+        return $baseline;
+    }
+
+    public function updateBaseline($id, array $data)
+    {
+        $baseline = $this->repository->updateBaseline($id, $data);
+        $this->clearCaches($id, $baseline->project_id ?? ($data['project_id'] ?? null));
+        return $baseline;
+    }
+
+    public function deleteBaseline($id)
+    {
+        $baseline = $this->repository->getBaselineById($id);
+        $result = $this->repository->deleteBaseline($id);
+        $this->clearCaches($id, $baseline->project_id ?? null);
+        return $result;
+    }
+
+    public function deleteBaselinesByProject($projectId)
+    {
+        $result = $this->repository->deleteBaselinesByProject($projectId);
+        $this->clearCaches(null, $projectId);
+        return $result;
+    }
+
+    protected function clearCaches($id = null, $projectId = null): void
+    {
+        Cache::forget(self::CACHE_ALL);
+        if ($id !== null) {
+            Cache::forget(self::CACHE_ID_PREFIX.$id);
+        }
+        if ($projectId !== null) {
+            Cache::forget(self::CACHE_PROJECT_PREFIX.$projectId);
+            Cache::forget(self::CACHE_LATEST_PREFIX.$projectId);
+        }
+    }
+}
+

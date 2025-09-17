@@ -8,6 +8,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectBaselineController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
@@ -72,11 +73,16 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
     Route::apiResource('projects', ProjectController::class)->only(['index','show']);
+    Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['index','show']);
+    Route::get('projects/{project}/baselines', [ProjectBaselineController::class, 'index']);
+    Route::get('projects/{project}/baselines/latest', [ProjectBaselineController::class, 'latest']);
 });
 
 // Management for those with 'mengelola project'
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('projects', ProjectController::class)->only(['store','update','destroy']);
+    Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['store','update','destroy']);
+    Route::delete('projects/{project}/baselines', [ProjectBaselineController::class, 'destroyByProject']);
     Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
 
@@ -198,3 +204,11 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::apiResource('attachments', AttachmentController::class)->only(['store','update','destroy']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
+
+
+
+
+
+
+
+

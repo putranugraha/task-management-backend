@@ -19,8 +19,10 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             DivisionSeeder::class,
             ProjectSeeder::class,
+            ProjectBaselineSeeder::class,
             MilestoneSeeder::class,
             TaskSeeder::class,
+            TaskBaselineSeeder::class,
             TaskDependencySeeder::class,
             TaskAssignmentSeeder::class,
             StatusHistorySeeder::class,
@@ -30,5 +32,7 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 }
+
+
 
 
