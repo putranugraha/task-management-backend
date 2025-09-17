@@ -13,6 +13,14 @@ use App\Repositories\Eloquent\DivisionRepository;
 use App\Services\Contracts\DivisionServiceInterface;
 use App\Services\Implementations\DivisionService;
 use App\Repositories\Contracts\ProjectRepositoryInterface;
+use App\Repositories\Contracts\RoleRepositoryInterface;
+use App\Repositories\Eloquent\RoleRepository;
+use App\Services\Contracts\RoleServiceInterface;
+use App\Services\Implementations\RoleService;
+use App\Repositories\Contracts\PermissionRepositoryInterface;
+use App\Repositories\Eloquent\PermissionRepository;
+use App\Services\Contracts\PermissionServiceInterface;
+use App\Services\Implementations\PermissionService;
 use App\Repositories\Eloquent\ProjectRepository;
 use App\Services\Contracts\ProjectServiceInterface;
 use App\Services\Implementations\ProjectService;
@@ -63,6 +71,12 @@ class AppServiceProvider extends ServiceProvider
         // Bind Project interfaces to implementations
         $this->app->bind(ProjectRepositoryInterface::class, ProjectRepository::class);
         $this->app->bind(ProjectServiceInterface::class, ProjectService::class);
+        // Bind Role interfaces to implementations
+        $this->app->bind(RoleRepositoryInterface::class, RoleRepository::class);
+        $this->app->bind(RoleServiceInterface::class, RoleService::class);
+        // Bind Permission interfaces to implementations
+        $this->app->bind(PermissionRepositoryInterface::class, PermissionRepository::class);
+        $this->app->bind(PermissionServiceInterface::class, PermissionService::class);
         // Bind Milestone interfaces to implementations
         $this->app->bind(MilestoneRepositoryInterface::class, MilestoneRepository::class);
         $this->app->bind(MilestoneServiceInterface::class, MilestoneService::class);
