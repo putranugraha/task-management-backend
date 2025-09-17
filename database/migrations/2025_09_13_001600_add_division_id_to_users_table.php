@@ -13,7 +13,9 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'division_id')) {
-                $table->foreignId('division_id')->nullable()->after('status')->constrained('divisions')->nullOnDelete();
+                $table->foreignId('division_id')->nullable()->after('password_hash')->constrained('divisions')->nullOnDelete();
+            } else {
+                $table->foreign('division_id')->references('id')->on('divisions')->onDelete('set null');
             }
         });
     }
@@ -25,9 +27,16 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (Schema::hasColumn('users', 'division_id')) {
-                $table->dropConstrainedForeignId('division_id');
+                try {
+                    $table->dropForeign(['division_id']);
+                } catch (\Throwable $e) {
+                    // Foreign key might not exist; ignore.
+                }
+
+                if (!Schema::hasColumn('users', 'password_hash')) {
+                    $table->dropColumn('division_id');
+                }
             }
         });
     }
 };
-

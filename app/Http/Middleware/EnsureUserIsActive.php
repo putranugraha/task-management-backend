@@ -17,11 +17,10 @@ class EnsureUserIsActive
     {
         $user = $request->user();
 
-        if ($user && ($user->status ?? null) !== 'Aktif') {
+        if ($user && (($user->status ?? null) !== 'Aktif' || !$user->is_active)) {
             return response()->json(['message' => 'Akun Anda tidak aktif.'], 403);
         }
 
         return $next($request);
     }
 }
-

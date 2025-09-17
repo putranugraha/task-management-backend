@@ -1,7 +1,6 @@
 <?php
 namespace Database\Factories;
 
-use App\Models\Division;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -28,10 +27,13 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'division_id' => Division::factory(),
+            'password_hash' => static::$password ??= Hash::make('password'),
+            'division_id' => null,
+            'job_title' => fake()->optional()->jobTitle(),
+            'is_active' => true,
+            'last_login_at' => null,
             'remember_token' => Str::random(10),
-            'status' => 'Aktif', // Default status is active
+            'status' => 'Aktif',
         ];
     }
 
@@ -52,4 +54,3 @@ class UserFactory extends Factory
         });
     }
 }
-

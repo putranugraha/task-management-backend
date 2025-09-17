@@ -8,32 +8,24 @@ use Illuminate\Validation\Rule;
 
 class UserUpdateRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         $userId = $this->route('user');
         $user = User::with('roles')->find($userId);
 
         return [
-            'name' => 'sometimes|required|string|max:50|min:3',
+            'name' => 'sometimes|required|string|max:150|min:3',
             'email' => [
                 'sometimes',
                 'required',
                 'string',
                 'email',
-                'max:50',
+                'max:150',
                 Rule::unique('users')->ignore($userId),
             ],
             'password' => [
@@ -55,6 +47,9 @@ class UserUpdateRequest extends FormRequest
                 'string',
                 Rule::exists('roles', 'name'),
             ],
+            'division_id' => 'sometimes|nullable|exists:divisions,id',
+            'job_title' => 'sometimes|nullable|string|max:150',
+            'is_active' => 'sometimes|boolean',
             'status' => [
                 'sometimes',
                 'required',
@@ -68,3 +63,5 @@ class UserUpdateRequest extends FormRequest
         ];
     }
 }
+
+

@@ -14,7 +14,6 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // Login dengan Sanctum
     public function login(Request $request)
     {
         $request->validate([
@@ -30,16 +29,21 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        // Regenerate session for SPA (Sanctum cookie-based)
+        if (($user->status ?? null) !== 'Aktif' || !$user->is_active) {
+            Auth::logout();
+            return response()->json(['message' => 'Akun Anda tidak aktif.'], 403);
+        }
+
+        $user->forceFill([
+            'last_login_at' => Carbon::now(),
+        ])->save();
+
         if ($request->hasSession()) {
             $request->session()->regenerate();
         }
 
-        if (($user->status ?? null) !== 'Aktif') {
-            return response()->json(['message' => 'Akun Anda tidak aktif.'], 403);
-        }
+        $user->loadMissing('division', 'roles');
 
-        // Issue a token for non-SPA clients (24 jam)
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
 
         return response()->json([
@@ -51,26 +55,27 @@ class AuthController extends Controller
         ], 200);
     }
 
-    // Registrasi user baru
     public function register(Request $request)
     {
         $request->validate([
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            // optional name; will default from email if missing
             'name' => ['sometimes', 'string', 'max:255'],
+            'job_title' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'division_id' => ['sometimes', 'nullable', 'exists:divisions,id'],
         ]);
 
         $user = User::create([
             'name' => $request->input('name', Str::before($request->email, '@')),
             'email' => $request->email,
-            // Model cast akan otomatis hash
-            'password' => $request->password,
+            'password_hash' => $request->password,
+            'job_title' => $request->input('job_title'),
+            'is_active' => true,
             'status' => 'Aktif',
         ]);
 
-        // Default role untuk pendaftaran
         $user->assignRole('Member');
+        $user->loadMissing('division', 'roles');
 
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
 
@@ -83,7 +88,6 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // Logout: hapus token saat ini dan invalidate session jika ada
     public function logout(Request $request)
     {
         if ($request->user() && method_exists($request->user(), 'currentAccessToken')) {
@@ -99,7 +103,6 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logout berhasil']);
     }
 
-    // Kirim email reset password
     public function sendResetLinkEmail(Request $request)
     {
         $request->validate(['email' => 'required|email']);
@@ -114,7 +117,6 @@ class AuthController extends Controller
         return response()->json(['status' => __($status)], 200);
     }
 
-    // Reset password
     public function resetPassword(Request $request)
     {
         $request->validate([
@@ -127,7 +129,7 @@ class AuthController extends Controller
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (User $user, string $password) {
                 $user->forceFill([
-                    'password' => Hash::make($password),
+                    'password_hash' => Hash::make($password),
                 ])->setRememberToken(Str::random(60));
 
                 $user->save();
@@ -143,3 +145,4 @@ class AuthController extends Controller
         return response()->json(['status' => __($status)], 200);
     }
 }
+

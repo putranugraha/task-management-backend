@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
 
 class UserSeeder extends Seeder
 {
@@ -13,26 +12,38 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Admin user
         $admin = User::factory()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
+            'password_hash' => 'password',
+            'job_title' => 'Administrator',
+            'is_active' => true,
+            'status' => 'Aktif',
+            'last_login_at' => null,
         ]);
         $admin->assignRole('Admin');
-        $admin->removeRole('Member'); // Remove default Member role
+        $admin->removeRole('Member');
 
-        // Manager user
         $manager = User::factory()->create([
             'name' => 'Manager',
             'email' => 'manager@example.com',
+            'password_hash' => 'password',
+            'job_title' => 'Project Manager',
+            'is_active' => true,
+            'status' => 'Aktif',
+            'last_login_at' => null,
         ]);
         $manager->assignRole('Manager');
-        $manager->removeRole('Member'); // Remove default Member role
+        $manager->removeRole('Member');
 
-        // Member user
         $member = User::factory()->create([
             'name' => 'Member',
             'email' => 'member@example.com',
+            'password_hash' => 'password',
+            'job_title' => 'Team Member',
+            'is_active' => true,
+            'status' => 'Aktif',
+            'last_login_at' => null,
         ]);
         $member->assignRole('Member');
     }

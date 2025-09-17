@@ -14,26 +14,32 @@ class User extends Authenticatable
     use HasFactory, Notifiable, HasRoles, HasApiTokens;
 
     /**
-     * The attributes that are mass assignable.
-     *
      * @var list<string>
      */
     protected $fillable = [
         'name',
         'email',
-        'password',
+        'password_hash',
         'division_id',
+        'job_title',
+        'is_active',
+        'last_login_at',
         'status',
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
      * @var list<string>
      */
     protected $hidden = [
-        'password',
+        'password_hash',
         'remember_token',
+    ];
+
+    protected $casts = [
+        'password_hash' => 'hashed',
+        'is_active' => 'boolean',
+        'last_login_at' => 'datetime',
+        'email_verified_at' => 'datetime',
     ];
 
     public function division()
@@ -41,17 +47,9 @@ class User extends Authenticatable
         return $this->belongsTo(Division::class);
     }
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    public function getAuthPassword()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->password_hash;
     }
 }
 
