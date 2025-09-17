@@ -15,6 +15,7 @@ use App\Repositories\Contracts\MilestoneRepositoryInterface;
 use App\Repositories\Contracts\PermissionRepositoryInterface;
 use App\Repositories\Contracts\ProjectBaselineRepositoryInterface;
 use App\Repositories\Contracts\ProjectRepositoryInterface;
+use App\Repositories\Contracts\ReportingPeriodRepositoryInterface;
 use App\Repositories\Contracts\RoleRepositoryInterface;
 use App\Repositories\Contracts\StatusHistoryRepositoryInterface;
 use App\Repositories\Contracts\TaskAssignmentRepositoryInterface;
@@ -29,6 +30,7 @@ use App\Repositories\Eloquent\MilestoneRepository;
 use App\Repositories\Eloquent\PermissionRepository;
 use App\Repositories\Eloquent\ProjectBaselineRepository;
 use App\Repositories\Eloquent\ProjectRepository;
+use App\Repositories\Eloquent\ReportingPeriodRepository;
 use App\Repositories\Eloquent\RoleRepository;
 use App\Repositories\Eloquent\StatusHistoryRepository;
 use App\Repositories\Eloquent\TaskAssignmentRepository;
@@ -43,6 +45,7 @@ use App\Services\Contracts\MilestoneServiceInterface;
 use App\Services\Contracts\PermissionServiceInterface;
 use App\Services\Contracts\ProjectBaselineServiceInterface;
 use App\Services\Contracts\ProjectServiceInterface;
+use App\Services\Contracts\ReportingPeriodServiceInterface;
 use App\Services\Contracts\RoleServiceInterface;
 use App\Services\Contracts\StatusHistoryServiceInterface;
 use App\Services\Contracts\TaskAssignmentServiceInterface;
@@ -57,6 +60,7 @@ use App\Services\Implementations\MilestoneService;
 use App\Services\Implementations\PermissionService;
 use App\Services\Implementations\ProjectBaselineService;
 use App\Services\Implementations\ProjectService;
+use App\Services\Implementations\ReportingPeriodService;
 use App\Services\Implementations\RoleService;
 use App\Services\Implementations\StatusHistoryService;
 use App\Services\Implementations\TaskAssignmentService;
@@ -79,6 +83,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind Project interfaces to implementations
         $this->app->bind(ProjectRepositoryInterface::class, ProjectRepository::class);
         $this->app->bind(ProjectServiceInterface::class, ProjectService::class);
+        // Bind ReportingPeriod interfaces to implementations
+        $this->app->bind(ReportingPeriodRepositoryInterface::class, ReportingPeriodRepository::class);
+        $this->app->bind(ReportingPeriodServiceInterface::class, ReportingPeriodService::class);
         // Bind ProjectBaseline interfaces to implementations
         $this->app->bind(ProjectBaselineRepositoryInterface::class, ProjectBaselineRepository::class);
         $this->app->bind(ProjectBaselineServiceInterface::class, ProjectBaselineService::class);

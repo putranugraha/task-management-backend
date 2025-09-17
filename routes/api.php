@@ -9,7 +9,8 @@ use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProjectBaselineController;
-use App\Http\Controllers\ProjectController;
+use App\\Http\\Controllers\\ProjectController;
+use App\\Http\\Controllers\\ReportingPeriodController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StatusHistoryController;
 use App\Http\Controllers\TaskAssignmentController;
@@ -81,6 +82,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::get('project-baselines/{baseline}/task-baselines', [TaskBaselineController::class, 'index']);
     Route::get('tasks/{task}/task-baselines', [TaskBaselineController::class, 'index']);
     Route::get('project-baselines/{baseline}/task-baselines/total-weight', [TaskBaselineController::class, 'totalWeight']);
+    Route::apiResource('reporting-periods', ReportingPeriodController::class)->only(['index','show']);
+    Route::get('projects/{project}/reporting-periods', [ReportingPeriodController::class, 'index']);
 });
 
 // Management for those with 'mengelola project'
@@ -90,6 +93,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::apiResource('task-baselines', TaskBaselineController::class)->only(['store','update','destroy']);
     Route::delete('projects/{project}/baselines', [ProjectBaselineController::class, 'destroyByProject']);
     Route::delete('project-baselines/{baseline}/task-baselines', [TaskBaselineController::class, 'destroyByBaseline']);
+    Route::apiResource('reporting-periods', ReportingPeriodController::class)->only(['store','update','destroy']);
+    Route::delete('projects/{project}/reporting-periods', [ReportingPeriodController::class, 'destroyByProject']);
     Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
 
@@ -211,6 +216,15 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::apiResource('attachments', AttachmentController::class)->only(['store','update','destroy']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
+
+
+
+
+
+
+
+
+
 
 
 

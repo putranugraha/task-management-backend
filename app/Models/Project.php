@@ -55,7 +55,13 @@ class Project extends Model
     {
         return $this->hasMany(ProjectBaseline::class);
     }
+
+    /**
+     * Reporting periods captured for the project.
+     */
+    public function reportingPeriods()
+    {
+        return $this->hasMany(ReportingPeriod::class);
+    }
 }
-
-
 
