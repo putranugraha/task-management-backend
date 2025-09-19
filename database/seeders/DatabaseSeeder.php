@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             TaskAssignmentSeeder::class,
             StatusHistorySeeder::class,
             TimeEntrySeeder::class,
+            KpiSnapshotSeeder::class,
             CommentSeeder::class,
             AttachmentSeeder::class,
         ]);
