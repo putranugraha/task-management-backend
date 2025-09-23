@@ -7,7 +7,6 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use App\Http\Resources\UserResource;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -21,26 +20,23 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        $user = User::query()
+            ->where('email', $request->email)
+            ->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password_hash)) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
-        $user = Auth::user();
-
-        if (($user->status ?? null) !== 'Aktif' || !$user->is_active) {
-            Auth::logout();
+        if (($user->status ?? null) !== 'Aktif' || ! $user->is_active) {
             return response()->json(['message' => 'Akun Anda tidak aktif.'], 403);
         }
 
         $user->forceFill([
             'last_login_at' => Carbon::now(),
         ])->save();
-
-        if ($request->hasSession()) {
-            $request->session()->regenerate();
-        }
 
         $user->loadMissing('division', 'roles');
 
@@ -95,7 +91,6 @@ class AuthController extends Controller
         }
 
         if ($request->hasSession()) {
-            Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
         }
@@ -145,4 +140,3 @@ class AuthController extends Controller
         return response()->json(['status' => __($status)], 200);
     }
 }
-

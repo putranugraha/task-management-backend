@@ -13,10 +13,12 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // Explicit origins for local Next.js
-    'allowed_origins' => [
-        'http://localhost:3000',
-    ],
+    'allowed_origins' => collect(explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')))
+        ->map(fn (string $origin) => rtrim(trim($origin), '/'))
+        ->filter()
+        ->unique()
+        ->values()
+        ->all(),
 
     'allowed_origins_patterns' => [],
 
@@ -29,4 +31,3 @@ return [
     'supports_credentials' => true,
 
 ];
-
