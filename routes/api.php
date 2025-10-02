@@ -18,6 +18,7 @@ use App\Http\Controllers\TaskBaselineController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TimeEntryController;
+use App\Http\Controllers\KpiSnapshotController;
 use App\Http\Controllers\UserController;
 
 // Public auth routes (throttled)
@@ -84,6 +85,10 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::get('project-baselines/{baseline}/task-baselines/total-weight', [TaskBaselineController::class, 'totalWeight']);
     Route::apiResource('reporting-periods', ReportingPeriodController::class)->only(['index','show']);
     Route::get('projects/{project}/reporting-periods', [ReportingPeriodController::class, 'index']);
+    // KPI Snapshots read-only
+    Route::apiResource('kpi-snapshots', KpiSnapshotController::class)->only(['index','show']);
+    Route::get('projects/{project}/kpi-snapshots', [KpiSnapshotController::class, 'index']);
+    Route::get('projects/{project}/kpi-snapshots/average-cycle-time', [KpiSnapshotController::class, 'averageCycleTimeByProject']);
 });
 
 // Management for those with 'mengelola project'
@@ -95,6 +100,9 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::delete('project-baselines/{baseline}/task-baselines', [TaskBaselineController::class, 'destroyByBaseline']);
     Route::apiResource('reporting-periods', ReportingPeriodController::class)->only(['store','update','destroy']);
     Route::delete('projects/{project}/reporting-periods', [ReportingPeriodController::class, 'destroyByProject']);
+    // KPI Snapshots manage
+    Route::apiResource('kpi-snapshots', KpiSnapshotController::class)->only(['store','update','destroy']);
+    Route::delete('projects/{project}/kpi-snapshots', [KpiSnapshotController::class, 'destroyByProject']);
     Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
 

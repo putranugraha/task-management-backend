@@ -23,6 +23,7 @@ use App\Repositories\Contracts\TaskBaselineRepositoryInterface;
 use App\Repositories\Contracts\TaskDependencyRepositoryInterface;
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Repositories\Contracts\TimeEntryRepositoryInterface;
+use App\Repositories\Contracts\KpiSnapshotRepositoryInterface;
 use App\Repositories\Eloquent\AttachmentRepository;
 use App\Repositories\Eloquent\CommentRepository;
 use App\Repositories\Eloquent\DivisionRepository;
@@ -38,6 +39,7 @@ use App\Repositories\Eloquent\TaskBaselineRepository;
 use App\Repositories\Eloquent\TaskDependencyRepository;
 use App\Repositories\Eloquent\TaskRepository;
 use App\Repositories\Eloquent\TimeEntryRepository;
+use App\Repositories\Eloquent\KpiSnapshotRepository;
 use App\Services\Contracts\AttachmentServiceInterface;
 use App\Services\Contracts\CommentServiceInterface;
 use App\Services\Contracts\DivisionServiceInterface;
@@ -53,6 +55,7 @@ use App\Services\Contracts\TaskBaselineServiceInterface;
 use App\Services\Contracts\TaskDependencyServiceInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use App\Services\Contracts\TimeEntryServiceInterface;
+use App\Services\Contracts\KpiSnapshotServiceInterface;
 use App\Services\Implementations\AttachmentService;
 use App\Services\Implementations\CommentService;
 use App\Services\Implementations\DivisionService;
@@ -68,6 +71,7 @@ use App\Services\Implementations\TaskBaselineService;
 use App\Services\Implementations\TaskDependencyService;
 use App\Services\Implementations\TaskService;
 use App\Services\Implementations\TimeEntryService;
+use App\Services\Implementations\KpiSnapshotService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -122,6 +126,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind Attachment interfaces to implementations
         $this->app->bind(AttachmentRepositoryInterface::class, AttachmentRepository::class);
         $this->app->bind(AttachmentServiceInterface::class, AttachmentService::class);
+        // Bind KPI Snapshot interfaces to implementations
+        $this->app->bind(KpiSnapshotRepositoryInterface::class, KpiSnapshotRepository::class);
+        $this->app->bind(KpiSnapshotServiceInterface::class, KpiSnapshotService::class);
     }
 
     /**
