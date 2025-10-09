@@ -20,8 +20,11 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
+        // Normalisasi email agar pencarian tidak sensitif huruf besar/kecil dan spasi
+        $normalizedEmail = strtolower(trim($request->email));
+
         $user = User::query()
-            ->where('email', $request->email)
+            ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
             ->first();
 
         if (! $user || ! Hash::check($request->password, $user->password_hash)) {
@@ -63,7 +66,7 @@ class AuthController extends Controller
 
         $user = User::create([
             'name' => $request->input('name', Str::before($request->email, '@')),
-            'email' => $request->email,
+            'email' => strtolower(trim($request->email)),
             'password_hash' => $request->password,
             'job_title' => $request->input('job_title'),
             'is_active' => true,

@@ -24,6 +24,7 @@ use App\Repositories\Contracts\TaskDependencyRepositoryInterface;
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Repositories\Contracts\TimeEntryRepositoryInterface;
 use App\Repositories\Contracts\KpiSnapshotRepositoryInterface;
+use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Repositories\Eloquent\AttachmentRepository;
 use App\Repositories\Eloquent\CommentRepository;
 use App\Repositories\Eloquent\DivisionRepository;
@@ -40,6 +41,7 @@ use App\Repositories\Eloquent\TaskDependencyRepository;
 use App\Repositories\Eloquent\TaskRepository;
 use App\Repositories\Eloquent\TimeEntryRepository;
 use App\Repositories\Eloquent\KpiSnapshotRepository;
+use App\Repositories\Eloquent\UserRepository;
 use App\Services\Contracts\AttachmentServiceInterface;
 use App\Services\Contracts\CommentServiceInterface;
 use App\Services\Contracts\DivisionServiceInterface;
@@ -56,6 +58,7 @@ use App\Services\Contracts\TaskDependencyServiceInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use App\Services\Contracts\TimeEntryServiceInterface;
 use App\Services\Contracts\KpiSnapshotServiceInterface;
+use App\Services\Contracts\UserServiceInterface;
 use App\Services\Implementations\AttachmentService;
 use App\Services\Implementations\CommentService;
 use App\Services\Implementations\DivisionService;
@@ -72,6 +75,7 @@ use App\Services\Implementations\TaskDependencyService;
 use App\Services\Implementations\TaskService;
 use App\Services\Implementations\TimeEntryService;
 use App\Services\Implementations\KpiSnapshotService;
+use App\Services\Implementations\UserService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -129,6 +133,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind KPI Snapshot interfaces to implementations
         $this->app->bind(KpiSnapshotRepositoryInterface::class, KpiSnapshotRepository::class);
         $this->app->bind(KpiSnapshotServiceInterface::class, KpiSnapshotService::class);
+        // Bind User interfaces to implementations
+        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
+        $this->app->bind(UserServiceInterface::class, UserService::class);
     }
 
     /**
@@ -145,4 +152,3 @@ class AppServiceProvider extends ServiceProvider
         ]);
     }
 }
-

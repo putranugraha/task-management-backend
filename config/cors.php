@@ -9,6 +9,7 @@ return [
         'login',
         'logout',
         'user',
+        'broadcasting/*',
     ],
 
     'allowed_methods' => ['*'],
@@ -24,7 +25,8 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Expose auth-related headers when needed
+    'exposed_headers' => ['Authorization', 'X-XSRF-TOKEN'],
 
     'max_age' => 0,
 
