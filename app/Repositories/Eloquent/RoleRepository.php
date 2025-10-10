@@ -30,7 +30,7 @@ class RoleRepository implements RoleRepositoryInterface
      */
     public function getAllRoles()
     {
-        return $this->role->all();
+        return $this->role->with('permissions')->get();
     }
 
     /**
@@ -43,7 +43,7 @@ class RoleRepository implements RoleRepositoryInterface
     {
         try {
             // Mengambil role berdasarkan ID, handle jika tidak ditemukan
-            return $this->role->findOrFail($id);
+            return $this->role->with('permissions')->findOrFail($id);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error("Role with ID {$id} not found.");
             return null;
@@ -69,7 +69,7 @@ class RoleRepository implements RoleRepositoryInterface
      */
     public function getRoleByStatus($status)
     {
-        return $this->role->where('status', $status)->get();
+        return $this->role->with('permissions')->where('status', $status)->get();
     }
 
     /**
