@@ -22,11 +22,15 @@ class DivisionController extends Controller
         $code = $request->query('code');
         $name = $request->query('name');
         $withUsersCount = $request->boolean('with_users_count');
+        $withUsers = $request->boolean('with_users');
 
         if ($code) {
             $division = $this->service->getDivisionByCode($code);
             if (!$division) {
                 return response()->json(['message' => 'Division tidak ditemukan'], 404);
+            }
+            if ($withUsers) {
+                $division->load('users');
             }
             if ($withUsersCount) {
                 $count = $this->service->countUsersInDivision($division->id);
@@ -40,6 +44,9 @@ class DivisionController extends Controller
             if (!$division) {
                 return response()->json(['message' => 'Division tidak ditemukan'], 404);
             }
+            if ($withUsers) {
+                $division->load('users');
+            }
             if ($withUsersCount) {
                 $count = $this->service->countUsersInDivision($division->id);
                 $division->setAttribute('users_count', $count ?? 0);
@@ -48,6 +55,9 @@ class DivisionController extends Controller
         }
 
         $divisions = $this->service->getAllDivisions();
+        if ($withUsers && method_exists($divisions, 'load')) {
+            $divisions->load('users');
+        }
         if ($withUsersCount && method_exists($divisions, 'map')) {
             $divisions = $divisions->map(function ($division) {
                 $count = $this->service->countUsersInDivision($division->id);
@@ -73,6 +83,10 @@ class DivisionController extends Controller
         $division = $this->service->getDivisionById($id);
         if (!$division) {
             return response()->json(['message' => 'Division tidak ditemukan'], 404);
+        }
+
+        if ($request->boolean('with_users')) {
+            $division->load('users');
         }
 
         if ($request->boolean('with_users_count')) {
