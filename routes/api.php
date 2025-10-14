@@ -110,11 +110,15 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
     Route::apiResource('milestones', MilestoneController::class)->only(['index','show']);
+    // Nested listing by project
+    Route::get('projects/{project}/milestones', [MilestoneController::class, 'indexByProject']);
 });
 
 // Manage milestones with 'mengelola project'
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('milestones', MilestoneController::class)->only(['store','update','destroy']);
+    // Nested create by project
+    Route::post('projects/{project}/milestones', [MilestoneController::class, 'storeForProject']);
     Route::patch('milestones/{milestone}/status', [MilestoneController::class, 'updateStatus']);
     Route::patch('milestones/{milestone}/complete', [MilestoneController::class, 'complete']);
 });

@@ -63,5 +63,13 @@ class Project extends Model
     {
         return $this->hasMany(ReportingPeriod::class);
     }
+
+    /**
+     * Milestones belonging to the project.
+     */
+    public function milestones()
+    {
+        return $this->hasMany(Milestone::class);
+    }
 }
 

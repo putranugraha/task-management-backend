@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Project;
 use App\Http\Requests\MilestoneStoreRequest;
 use App\Http\Requests\MilestoneUpdateRequest;
 use App\Http\Resources\MilestoneResource;
@@ -40,6 +41,26 @@ class MilestoneController extends Controller
     public function store(MilestoneStoreRequest $request)
     {
         $ms = $this->service->createMilestone($request->validated());
+        if (!$ms) return response()->json(['message' => 'Gagal membuat milestone'], 400);
+        return new MilestoneResource($ms);
+    }
+
+    /**
+     * Nested: GET /projects/{project}/milestones
+     */
+    public function indexByProject(Project $project)
+    {
+        $milestones = $this->service->getMilestonesByProject($project->id);
+        return MilestoneResource::collection($milestones);
+    }
+
+    /**
+     * Nested: POST /projects/{project}/milestones
+     */
+    public function storeForProject(Project $project, MilestoneStoreRequest $request)
+    {
+        $data = array_merge($request->validated(), ['project_id' => $project->id]);
+        $ms = $this->service->createMilestone($data);
         if (!$ms) return response()->json(['message' => 'Gagal membuat milestone'], 400);
         return new MilestoneResource($ms);
     }
@@ -82,4 +103,3 @@ class MilestoneController extends Controller
         return new MilestoneResource($ms);
     }
 }
-
