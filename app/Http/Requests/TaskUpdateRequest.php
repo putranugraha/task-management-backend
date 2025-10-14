@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use App\Models\Task;
 
 class TaskUpdateRequest extends FormRequest
 {
@@ -13,8 +15,22 @@ class TaskUpdateRequest extends FormRequest
 
     public function rules(): array
     {
+        $taskId = $this->route('task');
+        $existingProjectId = null;
+        if ($taskId) {
+            $existingProjectId = Task::query()->whereKey($taskId)->value('project_id');
+        }
+
+        $projectId = $this->input('project_id', $existingProjectId);
+
         return [
             'project_id' => 'sometimes|required|exists:projects,id',
+            'milestone_id' => [
+                'sometimes', 'nullable', 'integer',
+                $projectId
+                    ? Rule::exists('milestones', 'id')->where(fn ($q) => $q->where('project_id', $projectId))
+                    : 'nullable',
+            ],
             'title' => 'sometimes|required|string|max:200',
             'description' => 'sometimes|nullable|string',
             'priority' => 'sometimes|required|in:Low,Medium,High,Critical',
@@ -29,4 +45,3 @@ class TaskUpdateRequest extends FormRequest
         ];
     }
 }
-

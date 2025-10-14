@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class TaskStoreRequest extends FormRequest
 {
@@ -15,6 +16,10 @@ class TaskStoreRequest extends FormRequest
     {
         return [
             'project_id' => 'required|exists:projects,id',
+            'milestone_id' => [
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('milestones', 'id')->where(fn ($q) => $q->where('project_id', $this->input('project_id'))),
+            ],
             'title' => 'required|string|max:200',
             'description' => 'nullable|string',
             'priority' => 'required|in:Low,Medium,High,Critical',
@@ -29,4 +34,3 @@ class TaskStoreRequest extends FormRequest
         ];
     }
 }
-

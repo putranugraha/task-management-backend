@@ -7,6 +7,7 @@ interface TaskServiceInterface
     public function getAllTasks();
     public function getTaskById($id);
     public function getTasksByProject($projectId);
+    public function getTasksByMilestone($milestoneId);
     public function getTasksByStatus($status);
     public function getTasksByPriority($priority);
     public function getTasksByPlannedDateRange($startDate, $endDate);

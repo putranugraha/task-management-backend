@@ -45,4 +45,7 @@ interface TaskRepositoryInterface
 
     /** Ambil semua task yang bergantung pada task tertentu (depends_on_task_id). */
     public function getTasksByDependsOnTask($dependsOnTaskId);
+
+    /** Ambil semua task berdasarkan ID milestone. */
+    public function getTasksByMilestone($milestoneId);
 }

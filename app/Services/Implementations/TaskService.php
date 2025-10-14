@@ -16,6 +16,7 @@ class TaskService implements TaskServiceInterface
     const CACHE_ID_PREFIX = 'task.'; // + id
     const CACHE_STATUS_PREFIX = 'tasks.status.'; // + status
     const CACHE_PROJECT_PREFIX = 'tasks.project.'; // + projectId
+    const CACHE_MILESTONE_PREFIX = 'tasks.milestone.'; // + milestoneId
     const CACHE_PRIORITY_PREFIX = 'tasks.priority.'; // + priority
     const CACHE_DURATION = 1800; // 30 minutes
 
@@ -41,6 +42,11 @@ class TaskService implements TaskServiceInterface
     public function getTasksByProject($projectId)
     {
         return Cache::remember(self::CACHE_PROJECT_PREFIX.$projectId, self::CACHE_DURATION, fn () => $this->repository->getTasksByProject($projectId));
+    }
+
+    public function getTasksByMilestone($milestoneId)
+    {
+        return Cache::remember(self::CACHE_MILESTONE_PREFIX.$milestoneId, self::CACHE_DURATION, fn () => $this->repository->getTasksByMilestone($milestoneId));
     }
 
     public function getTasksByStatus($status)
@@ -71,14 +77,14 @@ class TaskService implements TaskServiceInterface
     public function createTask(array $data)
     {
         $task = $this->repository->createTask($data);
-        $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null);
+        $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
         return $task;
     }
 
     public function updateTask($id, array $data)
     {
         $task = $this->repository->updateTask($id, $data);
-        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null);
+        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
         return $task;
     }
 
@@ -86,7 +92,7 @@ class TaskService implements TaskServiceInterface
     {
         $task = $this->getTaskById($id);
         $result = $this->repository->deleteTask($id);
-        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null);
+        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
         return $result;
     }
 
@@ -133,12 +139,13 @@ class TaskService implements TaskServiceInterface
         return $task;
     }
 
-    protected function clearCaches($id = null, $status = null, $projectId = null, $priority = null): void
+    protected function clearCaches($id = null, $status = null, $projectId = null, $priority = null, $milestoneId = null): void
     {
         Cache::forget(self::CACHE_ALL);
         if ($id) Cache::forget(self::CACHE_ID_PREFIX.$id);
         if ($status) Cache::forget(self::CACHE_STATUS_PREFIX.$status);
         if ($projectId) Cache::forget(self::CACHE_PROJECT_PREFIX.$projectId);
         if ($priority) Cache::forget(self::CACHE_PRIORITY_PREFIX.$priority);
+        if ($milestoneId) Cache::forget(self::CACHE_MILESTONE_PREFIX.$milestoneId);
     }
 }

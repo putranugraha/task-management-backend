@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Http\Resources\TaskResource;
 use App\Http\Requests\TaskStoreRequest;
 use App\Http\Requests\TaskUpdateRequest;
+use App\Models\Milestone;
 use App\Services\Contracts\TaskServiceInterface;
 
 class TaskController extends Controller
@@ -20,6 +21,7 @@ class TaskController extends Controller
     public function index(Request $request)
     {
         // Optional filters
+        $milestoneId = $request->query('milestone_id');
         $projectId = $request->query('project_id');
         $status = $request->query('status');
         $priority = $request->query('priority');
@@ -30,7 +32,9 @@ class TaskController extends Controller
         $dependsOnTaskId = $request->query('depends_on_task_id');
         $include = $request->query('include'); // e.g., "dependencies,dependents,project"
 
-        if ($projectId) {
+        if ($milestoneId) {
+            $tasks = $this->service->getTasksByMilestone($milestoneId);
+        } elseif ($projectId) {
             $tasks = $this->service->getTasksByProject($projectId);
         } elseif ($status) {
             $tasks = $this->service->getTasksByStatus($status);
@@ -71,6 +75,28 @@ class TaskController extends Controller
     public function store(TaskStoreRequest $request)
     {
         $task = $this->service->createTask($request->validated());
+        if (!$task) return response()->json(['message' => 'Gagal membuat task'], 400);
+        return new TaskResource($task);
+    }
+
+    /**
+     * Nested: GET /milestones/{milestone}/tasks
+     */
+    public function indexByMilestone(Milestone $milestone)
+    {
+        $tasks = $this->service->getTasksByMilestone($milestone->id);
+        return TaskResource::collection($tasks);
+    }
+
+    /**
+     * Nested: POST /milestones/{milestone}/tasks
+     */
+    public function storeForMilestone(Milestone $milestone, TaskStoreRequest $request)
+    {
+        $data = $request->validated();
+        $data['project_id'] = $milestone->project_id; // enforce same project
+        $data['milestone_id'] = $milestone->id;
+        $task = $this->service->createTask($data);
         if (!$task) return response()->json(['message' => 'Gagal membuat task'], 400);
         return new TaskResource($task);
     }
