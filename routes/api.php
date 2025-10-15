@@ -127,6 +127,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
     Route::apiResource('tasks', TaskController::class)->only(['index','show']);
+    // Nested listing by project
+    Route::get('projects/{project}/tasks', [TaskController::class, 'indexByProject']);
     // Nested listing by milestone
     Route::get('milestones/{milestone}/tasks', [TaskController::class, 'indexByMilestone']);
 });
@@ -134,6 +136,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 // Manage tasks with 'mengelola project'
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('tasks', TaskController::class)->only(['store','update','destroy']);
+    // Nested create by project (optional convenience)
+    Route::post('projects/{project}/tasks', [TaskController::class, 'storeForProject']);
     // Nested create by milestone
     Route::post('milestones/{milestone}/tasks', [TaskController::class, 'storeForMilestone']);
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus']);

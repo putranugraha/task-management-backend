@@ -12,6 +12,7 @@ class TaskResource extends JsonResource
         return [
             'id' => $this->id,
             'project_id' => $this->project_id,
+            'milestone_id' => $this->milestone_id,
             'title' => $this->title,
             'description' => $this->description,
             'priority' => $this->priority,
@@ -29,6 +30,7 @@ class TaskResource extends JsonResource
                     'name' => $this->project->name,
                 ];
             }),
+            'milestone' => new MilestoneResource($this->whenLoaded('milestone')),
             'dependencies' => $this->whenLoaded('dependencies', function () use ($request) {
                 $deps = $this->dependencies;
                 $filterDependsOn = $request->query('depends_on_task_id');

@@ -7,6 +7,7 @@ use App\Http\Resources\TaskResource;
 use App\Http\Requests\TaskStoreRequest;
 use App\Http\Requests\TaskUpdateRequest;
 use App\Models\Milestone;
+use App\Models\Project;
 use App\Services\Contracts\TaskServiceInterface;
 
 class TaskController extends Controller
@@ -54,6 +55,7 @@ class TaskController extends Controller
         if ($include) {
             $map = [
                 'project' => 'project',
+                'milestone' => 'milestone',
                 'dependencies' => 'dependencies.dependsOn',
                 'dependents' => 'dependents.task',
             ];
@@ -96,6 +98,49 @@ class TaskController extends Controller
         $data = $request->validated();
         $data['project_id'] = $milestone->project_id; // enforce same project
         $data['milestone_id'] = $milestone->id;
+        $task = $this->service->createTask($data);
+        if (!$task) return response()->json(['message' => 'Gagal membuat task'], 400);
+        return new TaskResource($task);
+    }
+
+    /**
+     * Nested: GET /projects/{project}/tasks
+     */
+    public function indexByProject(Project $project, Request $request)
+    {
+        $tasks = $this->service->getTasksByProject($project->id);
+
+        // Optional include handling, mirroring index()
+        $include = $request->query('include'); // e.g., "dependencies,dependents,project,milestone"
+        if ($include && method_exists($tasks, 'load')) {
+            $map = [
+                'project' => 'project',
+                'milestone' => 'milestone',
+                'dependencies' => 'dependencies.dependsOn',
+                'dependents' => 'dependents.task',
+            ];
+            $rels = collect(explode(',', $include))
+                ->map(fn($s) => trim($s))
+                ->filter()
+                ->map(fn($key) => $map[$key] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+            if (!empty($rels)) {
+                $tasks->load($rels);
+            }
+        }
+
+        return TaskResource::collection($tasks);
+    }
+
+    /**
+     * Nested: POST /projects/{project}/tasks (optional convenience)
+     */
+    public function storeForProject(Project $project, TaskStoreRequest $request)
+    {
+        $data = $request->validated();
+        $data['project_id'] = $project->id;
         $task = $this->service->createTask($data);
         if (!$task) return response()->json(['message' => 'Gagal membuat task'], 400);
         return new TaskResource($task);

@@ -20,13 +20,13 @@ class TaskRepository implements TaskRepositoryInterface
 
     public function getAllTasks()
     {
-        return $this->model->with('project')->get();
+        return $this->model->with(['project', 'milestone'])->get();
     }
 
     public function getTaskById($id)
     {
         try {
-            return $this->model->with('project')->findOrFail($id);
+            return $this->model->with(['project', 'milestone'])->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("Task with ID {$id} not found.");
             return null;
@@ -35,22 +35,22 @@ class TaskRepository implements TaskRepositoryInterface
 
     public function getTasksByProject($projectId)
     {
-        return $this->model->where('project_id', $projectId)->with('project')->get();
+        return $this->model->where('project_id', $projectId)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByMilestone($milestoneId)
     {
-        return $this->model->where('milestone_id', $milestoneId)->with('project')->get();
+        return $this->model->where('milestone_id', $milestoneId)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByStatus($status)
     {
-        return $this->model->where('status', $status)->with('project')->get();
+        return $this->model->where('status', $status)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByPriority($priority)
     {
-        return $this->model->where('priority', $priority)->with('project')->get();
+        return $this->model->where('priority', $priority)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByPlannedDateRange($startDate, $endDate)
@@ -60,7 +60,7 @@ class TaskRepository implements TaskRepositoryInterface
             ->whereNotNull('end_planned')
             ->whereDate('end_planned', '>=', $startDate)
             ->whereDate('end_planned', '<=', $endDate)
-            ->with('project')
+            ->with(['project', 'milestone'])
             ->get();
     }
 
@@ -71,7 +71,7 @@ class TaskRepository implements TaskRepositoryInterface
             ->whereNotNull('end_actual')
             ->whereDate('end_actual', '>=', $startDate)
             ->whereDate('end_actual', '<=', $endDate)
-            ->with('project')
+            ->with(['project', 'milestone'])
             ->get();
     }
 
@@ -92,7 +92,7 @@ class TaskRepository implements TaskRepositoryInterface
 
         try {
             $task->update($data);
-            return $task->fresh('project');
+            return $task->fresh(['project', 'milestone']);
         } catch (\Exception $e) {
             Log::error("Failed to update task {$id}: {$e->getMessage()}");
             return null;
@@ -120,7 +120,7 @@ class TaskRepository implements TaskRepositoryInterface
 
         $task->status = $status;
         $task->save();
-        return $task->fresh('project');
+        return $task->fresh(['project', 'milestone']);
     }
 
     public function updateTaskProgress($id, $percent)
@@ -129,7 +129,7 @@ class TaskRepository implements TaskRepositoryInterface
         if (!$task) return null;
         $task->percent_complete = $percent;
         $task->save();
-        return $task->fresh('project');
+        return $task->fresh(['project', 'milestone']);
     }
 
     public function completeTask($id)
@@ -142,7 +142,7 @@ class TaskRepository implements TaskRepositoryInterface
         $task->percent_complete = 100;
         $task->save();
 
-        return $task->fresh('project');
+        return $task->fresh(['project', 'milestone']);
     }
 
     public function getTasksByDependsOnTask($dependsOnTaskId)
@@ -151,7 +151,7 @@ class TaskRepository implements TaskRepositoryInterface
             ->whereHas('dependencies', function ($q) use ($dependsOnTaskId) {
                 $q->where('depends_on_task_id', $dependsOnTaskId);
             })
-            ->with(['project', 'dependencies.dependsOn'])
+            ->with(['project', 'milestone', 'dependencies.dependsOn'])
             ->get();
     }
 
