@@ -50,6 +50,11 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola users'])->gro
     Route::apiResource('users', UserController::class);
 });
 
+// Lightweight Users options for FE (read-only)
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::get('users/options', [UserController::class, 'options']);
+});
+
 // Roles API
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola roles'])->group(function () {
     Route::apiResource('roles', RoleController::class)->only(['index','store','show','update','destroy']);

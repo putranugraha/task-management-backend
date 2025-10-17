@@ -58,6 +58,7 @@ class TaskController extends Controller
                 'milestone' => 'milestone',
                 'dependencies' => 'dependencies.dependsOn',
                 'dependents' => 'dependents.task',
+                'assignments' => 'assignments.user',
             ];
             $rels = collect(explode(',', $include))
                 ->map(fn($s) => trim($s))
@@ -118,6 +119,7 @@ class TaskController extends Controller
                 'milestone' => 'milestone',
                 'dependencies' => 'dependencies.dependsOn',
                 'dependents' => 'dependents.task',
+                'assignments' => 'assignments.user',
             ];
             $rels = collect(explode(',', $include))
                 ->map(fn($s) => trim($s))

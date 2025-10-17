@@ -7,6 +7,7 @@ use App\Services\Contracts\TaskServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use App\Models\StatusHistory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class TaskService implements TaskServiceInterface
 {
@@ -76,14 +77,69 @@ class TaskService implements TaskServiceInterface
 
     public function createTask(array $data)
     {
-        $task = $this->repository->createTask($data);
+        $assignments = $data['assignments'] ?? null;
+        unset($data['assignments']);
+
+        $task = null;
+        DB::transaction(function () use (&$task, $data, $assignments) {
+            $task = $this->repository->createTask($data);
+            if ($task && is_array($assignments) && !empty($assignments)) {
+                $rows = [];
+                foreach ($assignments as $a) {
+                    $rows[] = [
+                        'user_id' => $a['user_id'],
+                        'role_on_task' => $a['role_on_task'] ?? null,
+                        'estimated_effort_hours' => $a['estimated_effort_hours'] ?? null,
+                        'assigned_at' => now(),
+                    ];
+                }
+                if (!empty($rows)) {
+                    $task->assignments()->createMany($rows);
+                }
+            }
+        });
+
+        // Eager-load minimal relations for immediate response
+        if ($task) {
+            $task->loadMissing(['project', 'milestone', 'assignments.user']);
+        }
+
         $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
         return $task;
     }
 
     public function updateTask($id, array $data)
     {
-        $task = $this->repository->updateTask($id, $data);
+        $assignments = $data['assignments'] ?? null;
+        unset($data['assignments']);
+
+        $task = null;
+        DB::transaction(function () use (&$task, $id, $data, $assignments) {
+            $task = $this->repository->updateTask($id, $data);
+            if ($task !== null && $assignments !== null) {
+                // Replace strategy: delete existing, insert provided
+                $task->assignments()->delete();
+                if (is_array($assignments) && !empty($assignments)) {
+                    $rows = [];
+                    foreach ($assignments as $a) {
+                        $rows[] = [
+                            'user_id' => $a['user_id'],
+                            'role_on_task' => $a['role_on_task'] ?? null,
+                            'estimated_effort_hours' => $a['estimated_effort_hours'] ?? null,
+                            'assigned_at' => now(),
+                        ];
+                    }
+                    if (!empty($rows)) {
+                        $task->assignments()->createMany($rows);
+                    }
+                }
+            }
+        });
+
+        if ($task) {
+            $task->loadMissing(['project', 'milestone', 'assignments.user']);
+        }
+
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
         return $task;
     }

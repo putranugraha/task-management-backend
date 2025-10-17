@@ -80,5 +80,13 @@ class Task extends Model
     {
         return $this->hasMany(TaskBaseline::class);
     }
+
+    /**
+     * Assignments associated with this task.
+     */
+    public function assignments()
+    {
+        return $this->hasMany(TaskAssignment::class);
+    }
 }
 

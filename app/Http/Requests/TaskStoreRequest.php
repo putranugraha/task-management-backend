@@ -31,6 +31,11 @@ class TaskStoreRequest extends FormRequest
             'end_actual' => 'nullable|date|after_or_equal:start_actual',
             'duration_actual' => 'nullable|integer|min:0',
             'percent_complete' => 'nullable|integer|min:0|max:100',
+            // Optional task assignments payload
+            'assignments' => 'sometimes|array',
+            'assignments.*.user_id' => 'required|integer|exists:users,id',
+            'assignments.*.role_on_task' => 'nullable|string|exists:roles,name',
+            'assignments.*.estimated_effort_hours' => 'nullable|integer|min:0|max:10000',
         ];
     }
 }

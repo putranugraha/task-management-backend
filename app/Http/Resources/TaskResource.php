@@ -62,6 +62,20 @@ class TaskResource extends JsonResource
                     ];
                 });
             }),
+            'assignments' => $this->whenLoaded('assignments', function () {
+                return $this->assignments->map(function ($a) {
+                    return [
+                        'id' => $a->id,
+                        'role_on_task' => $a->role_on_task,
+                        'estimated_effort_hours' => $a->estimated_effort_hours,
+                        'assigned_at' => optional($a->assigned_at)->toDateTimeString(),
+                        'user' => [
+                            'id' => $a->user->id ?? null,
+                            'name' => $a->user->name ?? null,
+                        ],
+                    ];
+                });
+            }),
             'created_at' => optional($this->created_at)->toDateTimeString(),
             'updated_at' => optional($this->updated_at)->toDateTimeString(),
         ];
