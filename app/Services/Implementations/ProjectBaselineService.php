@@ -2,9 +2,13 @@
 
 namespace App\Services\Implementations;
 
+use App\Models\Project;
+use App\Models\Task;
 use App\Repositories\Contracts\ProjectBaselineRepositoryInterface;
 use App\Services\Contracts\ProjectBaselineServiceInterface;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ProjectBaselineService implements ProjectBaselineServiceInterface
 {
@@ -56,9 +60,51 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
 
     public function createBaseline(array $data)
     {
-        $baseline = $this->repository->createBaseline($data);
-        $this->clearCaches($baseline->id ?? null, $baseline->project_id ?? ($data['project_id'] ?? null));
-        return $baseline;
+        return DB::transaction(function () use ($data) {
+            $projectId = $data['project_id'] ?? null;
+            if (!$projectId) {
+                return null;
+            }
+
+            $project = Project::find($projectId);
+            if (!$project) {
+                return null;
+            }
+
+            $start = $project->start_planned ?? Carbon::now();
+
+            $tasks = Task::where('project_id', $project->id)->get(['id','start_planned','end_planned','duration_planned']);
+            $totalDays = (int) $tasks->sum('duration_planned');
+            $end = $totalDays > 0 ? Carbon::parse($start)->copy()->addDays($totalDays) : Carbon::parse($start)->copy();
+
+            // Force baseline start/end to computed values regardless of incoming overrides
+            $data['start_planned_base'] = Carbon::parse($start)->toDateString();
+            $data['end_planned_base'] = Carbon::parse($end)->toDateString();
+
+            // Default taken_at to now if missing (request still requires it, but be defensive)
+            if (empty($data['taken_at'])) {
+                $data['taken_at'] = Carbon::now();
+            }
+
+            $baseline = $this->repository->createBaseline($data);
+            if (!$baseline) {
+                return null;
+            }
+
+            // Generate task_baselines snapshot for each task
+            foreach ($tasks as $task) {
+                $baseline->taskBaselines()->create([
+                    'task_id' => $task->id,
+                    'start_planned_base' => $task->start_planned,
+                    'end_planned_base' => $task->end_planned,
+                    'duration_planned_base' => $task->duration_planned,
+                ]);
+            }
+
+            $this->clearCaches($baseline->id ?? null, $baseline->project_id ?? $project->id);
+
+            return $baseline;
+        });
     }
 
     public function updateBaseline($id, array $data)

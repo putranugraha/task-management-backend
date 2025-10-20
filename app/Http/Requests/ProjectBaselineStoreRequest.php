@@ -24,6 +24,8 @@ class ProjectBaselineStoreRequest extends FormRequest
             ],
             'taken_at' => 'required|date',
             'note' => 'sometimes|nullable|string',
+            'start_planned_base' => ['nullable', 'date'],
+            'end_planned_base' => ['nullable', 'date', 'after_or_equal:start_planned_base'],
         ];
     }
 }

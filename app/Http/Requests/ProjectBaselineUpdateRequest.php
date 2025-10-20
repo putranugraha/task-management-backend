@@ -31,6 +31,8 @@ class ProjectBaselineUpdateRequest extends FormRequest
             ],
             'taken_at' => 'sometimes|required|date',
             'note' => 'sometimes|nullable|string',
+            'start_planned_base' => ['sometimes','nullable','date'],
+            'end_planned_base' => ['sometimes','nullable','date','after_or_equal:start_planned_base'],
         ];
     }
 

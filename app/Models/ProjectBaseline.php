@@ -17,6 +17,8 @@ class ProjectBaseline extends Model
         'baseline_name',
         'taken_at',
         'note',
+        'start_planned_base',
+        'end_planned_base',
     ];
 
     /**
@@ -26,6 +28,8 @@ class ProjectBaseline extends Model
     {
         return [
             'taken_at' => 'datetime',
+            'start_planned_base' => 'date',
+            'end_planned_base' => 'date',
         ];
     }
 
