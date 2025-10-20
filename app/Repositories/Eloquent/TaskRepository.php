@@ -26,7 +26,7 @@ class TaskRepository implements TaskRepositoryInterface
     public function getTaskById($id)
     {
         try {
-            return $this->model->with(['project', 'milestone', 'assignments.user'])->findOrFail($id);
+            return $this->model->with(['project', 'milestone', 'assignments.user', 'dependencies.dependsOn'])->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("Task with ID {$id} not found.");
             return null;

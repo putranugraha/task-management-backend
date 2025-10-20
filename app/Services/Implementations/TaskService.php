@@ -78,10 +78,12 @@ class TaskService implements TaskServiceInterface
     public function createTask(array $data)
     {
         $assignments = $data['assignments'] ?? null;
+        $dependencies = $data['dependencies'] ?? null;
         unset($data['assignments']);
+        unset($data['dependencies']);
 
         $task = null;
-        DB::transaction(function () use (&$task, $data, $assignments) {
+        DB::transaction(function () use (&$task, $data, $assignments, $dependencies) {
             $task = $this->repository->createTask($data);
             if ($task && is_array($assignments) && !empty($assignments)) {
                 $rows = [];
@@ -97,11 +99,27 @@ class TaskService implements TaskServiceInterface
                     $task->assignments()->createMany($rows);
                 }
             }
+
+            if ($task && is_array($dependencies) && !empty($dependencies)) {
+                $depRows = [];
+                foreach ($dependencies as $d) {
+                    $dependsId = $d['depends_on_task_id'] ?? null;
+                    if (!$dependsId || $dependsId == $task->id) continue; // prevent self-dependency
+                    $depRows[] = [
+                        'depends_on_task_id' => $dependsId,
+                        'type' => $d['type'] ?? 'FS',
+                        'lag_days' => $d['lag_days'] ?? 0,
+                    ];
+                }
+                if (!empty($depRows)) {
+                    $task->dependencies()->createMany($depRows);
+                }
+            }
         });
 
         // Eager-load minimal relations for immediate response
         if ($task) {
-            $task->loadMissing(['project', 'milestone', 'assignments.user']);
+            $task->loadMissing(['project', 'milestone', 'assignments.user', 'dependencies.dependsOn']);
         }
 
         $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
@@ -111,10 +129,12 @@ class TaskService implements TaskServiceInterface
     public function updateTask($id, array $data)
     {
         $assignments = $data['assignments'] ?? null;
+        $dependencies = $data['dependencies'] ?? null;
         unset($data['assignments']);
+        unset($data['dependencies']);
 
         $task = null;
-        DB::transaction(function () use (&$task, $id, $data, $assignments) {
+        DB::transaction(function () use (&$task, $id, $data, $assignments, $dependencies) {
             $task = $this->repository->updateTask($id, $data);
             if ($task !== null && $assignments !== null) {
                 // Replace strategy: delete existing, insert provided
@@ -134,10 +154,30 @@ class TaskService implements TaskServiceInterface
                     }
                 }
             }
+
+            if ($task !== null && $dependencies !== null) {
+                // Replace dependencies if key provided
+                $task->dependencies()->delete();
+                if (is_array($dependencies) && !empty($dependencies)) {
+                    $depRows = [];
+                    foreach ($dependencies as $d) {
+                        $dependsId = $d['depends_on_task_id'] ?? null;
+                        if (!$dependsId || $dependsId == $task->id) continue; // prevent self-dependency
+                        $depRows[] = [
+                            'depends_on_task_id' => $dependsId,
+                            'type' => $d['type'] ?? 'FS',
+                            'lag_days' => $d['lag_days'] ?? 0,
+                        ];
+                    }
+                    if (!empty($depRows)) {
+                        $task->dependencies()->createMany($depRows);
+                    }
+                }
+            }
         });
 
         if ($task) {
-            $task->loadMissing(['project', 'milestone', 'assignments.user']);
+            $task->loadMissing(['project', 'milestone', 'assignments.user', 'dependencies.dependsOn']);
         }
 
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);

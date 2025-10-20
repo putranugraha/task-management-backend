@@ -47,6 +47,11 @@ class TaskUpdateRequest extends FormRequest
             'assignments.*.user_id' => 'required|integer|exists:users,id',
             'assignments.*.role_on_task' => 'nullable|string|exists:roles,name',
             'assignments.*.estimated_effort_hours' => 'nullable|integer|min:0|max:10000',
+            // Optional task dependencies payload to sync if provided
+            'dependencies' => 'sometimes|array',
+            'dependencies.*.depends_on_task_id' => 'required|integer|exists:tasks,id|different:task_id',
+            'dependencies.*.type' => 'nullable|in:FS,SS,FF,SF',
+            'dependencies.*.lag_days' => 'nullable|integer|min:-365|max:365',
         ];
     }
 }
