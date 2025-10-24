@@ -2,9 +2,12 @@
 
 namespace App\Services\Implementations;
 
+use App\Models\Task;
+use App\Models\ProjectBaseline;
 use App\Repositories\Contracts\TaskBaselineRepositoryInterface;
 use App\Services\Contracts\TaskBaselineServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class TaskBaselineService implements TaskBaselineServiceInterface
 {
@@ -52,9 +55,38 @@ class TaskBaselineService implements TaskBaselineServiceInterface
 
     public function createTaskBaseline(array $data)
     {
-        $taskBaseline = $this->repository->createTaskBaseline($data);
-        $this->clearCaches($taskBaseline->id ?? null, $taskBaseline->baseline_id ?? ($data['baseline_id'] ?? null), $taskBaseline->task_id ?? ($data['task_id'] ?? null));
-        return $taskBaseline;
+        return DB::transaction(function () use ($data) {
+            $task = Task::find($data['task_id'] ?? null);
+            if (!$task) {
+                return null;
+            }
+
+            // Determine baseline_id: prefer incoming value; otherwise pick latest project baseline by taken_at
+            $baselineId = $data['baseline_id'] ?? null;
+            if ($baselineId === null) {
+                $latestBaseline = ProjectBaseline::where('project_id', $task->project_id)
+                    ->latest('taken_at')
+                    ->first();
+                $baselineId = $latestBaseline->id ?? null;
+            }
+
+            $baselineData = [
+                'baseline_id' => $baselineId,
+                'task_id' => $task->id,
+                'start_planned_base' => $data['start_planned_base'] ?? $task->start_planned,
+                'end_planned_base' => $data['end_planned_base'] ?? $task->end_planned,
+                'duration_planned_base' => $data['duration_planned_base'] ?? $task->duration_planned,
+                'weight' => $data['weight'] ?? null,
+            ];
+
+            $taskBaseline = $this->repository->createTaskBaseline($baselineData);
+            $this->clearCaches(
+                $taskBaseline->id ?? null,
+                $taskBaseline->baseline_id ?? ($data['baseline_id'] ?? null),
+                $taskBaseline->task_id ?? ($data['task_id'] ?? null)
+            );
+            return $taskBaseline;
+        });
     }
 
     public function updateTaskBaseline($id, array $data)
