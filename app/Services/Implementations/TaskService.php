@@ -197,7 +197,13 @@ class TaskService implements TaskServiceInterface
         if (!in_array($status, self::ALLOWED_STATUSES)) return null;
         $before = $this->getTaskById($id);
         $task = $this->repository->updateTaskStatus($id, $status);
-        $this->clearCaches($id, $status, $task->project_id ?? null, $task->priority ?? null);
+        $this->clearCaches(
+            $id,
+            $status,
+            $task->project_id ?? null,
+            $task->priority ?? null,
+            $task->milestone_id ?? null,
+        );
         if ($task) {
             StatusHistory::create([
                 'task_id' => $task->id,
@@ -214,7 +220,13 @@ class TaskService implements TaskServiceInterface
     {
         if (!is_numeric($percent) || $percent < 0 || $percent > 100) return null;
         $task = $this->repository->updateTaskProgress($id, (int) $percent);
-        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null);
+        $this->clearCaches(
+            $id,
+            $task->status ?? null,
+            $task->project_id ?? null,
+            $task->priority ?? null,
+            $task->milestone_id ?? null,
+        );
         return $task;
     }
 
@@ -222,7 +234,13 @@ class TaskService implements TaskServiceInterface
     {
         $before = $this->getTaskById($id);
         $task = $this->repository->completeTask($id);
-        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null);
+        $this->clearCaches(
+            $id,
+            $task->status ?? null,
+            $task->project_id ?? null,
+            $task->priority ?? null,
+            $task->milestone_id ?? null,
+        );
         if ($task) {
             StatusHistory::create([
                 'task_id' => $task->id,

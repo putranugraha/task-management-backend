@@ -19,6 +19,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\KpiSnapshotController;
+use App\Http\Controllers\EvmController;
 use App\Http\Controllers\UserController;
 
 // Public auth routes (throttled)
@@ -94,6 +95,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::apiResource('kpi-snapshots', KpiSnapshotController::class)->only(['index','show']);
     Route::get('projects/{project}/kpi-snapshots', [KpiSnapshotController::class, 'index']);
     Route::get('projects/{project}/kpi-snapshots/average-cycle-time', [KpiSnapshotController::class, 'averageCycleTimeByProject']);
+    // EVM real-time aggregation
+    Route::get('projects/{project}/evm', [EvmController::class, 'projectEvm']);
 });
 
 // Management for those with 'mengelola project'
@@ -206,6 +209,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 // Manage time entries
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('time-entries', TimeEntryController::class)->only(['store','update','destroy']);
+    // Upsert endpoint to simplify FE client when logging time repeatedly on same day
+    Route::post('time-entries/upsert', [TimeEntryController::class, 'storeOrUpdate']);
 });
 
 // Comments API

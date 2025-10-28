@@ -19,7 +19,10 @@ class TimeEntryStoreRequest extends FormRequest
             'date' => 'required|date',
             'hours' => 'required|numeric|min:0|max:24',
             'note' => 'nullable|string',
+            // Optional: capture progress to be embedded into note
+            'progress' => 'sometimes|integer|min:0|max:100',
+            'percent' => 'sometimes|integer|min:0|max:100',
+            'percent_complete' => 'sometimes|integer|min:0|max:100',
         ];
     }
 }
-

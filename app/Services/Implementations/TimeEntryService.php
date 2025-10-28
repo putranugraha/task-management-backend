@@ -57,13 +57,44 @@ class TimeEntryService implements TimeEntryServiceInterface
 
     public function createTimeEntry(array $data)
     {
+        $data = $this->appendProgressToNote($data);
         $row = $this->repository->createTimeEntry($data);
         $this->clearCaches($row->id ?? null, $row->task_id ?? null, $row->user_id ?? null);
         return $row;
     }
 
+    /**
+     * Create or update a time entry uniquely identified by (task_id, user_id, date).
+     * Does not change table structure; leverages the unique index at DB level.
+     */
+    public function createOrUpdate(array $data)
+    {
+        // Normalise payload
+        $taskId = $data['task_id'];
+        $userId = $data['user_id'];
+        $date = $data['date'];
+        $hours = $data['hours'];
+        $note = ($this->appendProgressToNote($data)['note'] ?? ($data['note'] ?? null));
+
+        $row = \App\Models\TimeEntry::updateOrCreate(
+            [
+                'task_id' => $taskId,
+                'user_id' => $userId,
+                'date' => $date,
+            ],
+            [
+                'hours' => $hours,
+                'note' => $note,
+            ]
+        );
+
+        $this->clearCaches($row->id ?? null, $taskId, $userId);
+        return $row;
+    }
+
     public function updateTimeEntry($id, array $data)
     {
+        $data = $this->appendProgressToNote($data);
         $row = $this->repository->updateTimeEntry($id, $data);
         $this->clearCaches($id, $row->task_id ?? null, $row->user_id ?? null);
         return $row;
@@ -96,5 +127,40 @@ class TimeEntryService implements TimeEntryServiceInterface
         if ($taskId) Cache::forget(self::CACHE_TOTAL_TASK_PREFIX.$taskId);
         if ($userId) Cache::forget(self::CACHE_TOTAL_USER_PREFIX.$userId);
     }
-}
 
+    /**
+     * Append a "progress XX%" tag into note when optional progress fields provided.
+     * Does not alter structure; only enriches the note string.
+     */
+    protected function appendProgressToNote(array $data): array
+    {
+        $progress = $data['progress'] ?? $data['percent'] ?? $data['percent_complete'] ?? null;
+        if ($progress === null) {
+            return $data;
+        }
+        if (!is_numeric($progress)) {
+            return $data;
+        }
+        $p = (int) $progress;
+        if ($p < 0) $p = 0;
+        if ($p > 100) $p = 100;
+
+        $note = $data['note'] ?? '';
+        $tag = "progress {$p}%";
+
+        // Avoid duplicate tag if already present (case-insensitive contains)
+        if ($note === null || $note === '') {
+            $note = $tag;
+        } else {
+            $exists = stripos($note, 'progress') !== false && stripos($note, '%') !== false;
+            if (!$exists) {
+                $note = rtrim($note);
+                $note .= (substr($note, -1) === '.' || substr($note, -1) === ';') ? ' ' : ' | ';
+                $note .= $tag;
+            }
+        }
+
+        $data['note'] = $note;
+        return $data;
+    }
+}

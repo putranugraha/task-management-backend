@@ -32,6 +32,7 @@ class TaskBaselineUpdateRequest extends FormRequest
             'end_planned_base' => 'sometimes|nullable|date|after_or_equal:start_planned_base',
             'duration_planned_base' => 'sometimes|nullable|integer|min:0',
             'weight' => 'sometimes|nullable|numeric|min:0',
+            'planned_effort_hours' => 'sometimes|nullable|numeric|min:0',
         ];
     }
 

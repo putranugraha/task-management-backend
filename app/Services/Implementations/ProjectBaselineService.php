@@ -77,9 +77,9 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
             $totalDays = (int) $tasks->sum('duration_planned');
             $end = $totalDays > 0 ? Carbon::parse($start)->copy()->addDays($totalDays) : Carbon::parse($start)->copy();
 
-            // Force baseline start/end to computed values regardless of incoming overrides
-            $data['start_planned_base'] = Carbon::parse($start)->toDateString();
-            $data['end_planned_base'] = Carbon::parse($end)->toDateString();
+            // Respect FE-provided base dates; fallback to computed values if absent
+            $data['start_planned_base'] = $data['start_planned_base'] ?? Carbon::parse($start)->toDateString();
+            $data['end_planned_base'] = $data['end_planned_base'] ?? Carbon::parse($end)->toDateString();
 
             // Default taken_at to now if missing (request still requires it, but be defensive)
             if (empty($data['taken_at'])) {
@@ -93,11 +93,28 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
 
             // Generate task_baselines snapshot for each task
             foreach ($tasks as $task) {
+                // Inclusive duration from dates; fallback to task->duration_planned
+                $duration = null;
+                if ($task->start_planned && $task->end_planned) {
+                    try {
+                        $s = Carbon::parse($task->start_planned);
+                        $e = Carbon::parse($task->end_planned);
+                        $duration = max(1, $s->diffInDays($e) + 1);
+                    } catch (\Throwable $t) {
+                        $duration = null;
+                    }
+                }
+                if (!$duration && $task->duration_planned) {
+                    $duration = max(1, (int) $task->duration_planned);
+                }
+
                 $baseline->taskBaselines()->create([
                     'task_id' => $task->id,
                     'start_planned_base' => $task->start_planned,
                     'end_planned_base' => $task->end_planned,
-                    'duration_planned_base' => $task->duration_planned,
+                    'duration_planned_base' => $duration,
+                    'planned_effort_hours' => $duration ? (float) $duration * 8.0 : null,
+                    'weight' => 1,
                 ]);
             }
 

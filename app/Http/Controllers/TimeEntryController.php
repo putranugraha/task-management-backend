@@ -62,6 +62,16 @@ class TimeEntryController extends Controller
         return new TimeEntryResource($row);
     }
 
+    /**
+     * Upsert time entry by (task_id, user_id, date).
+     * Simplifies FE flow: repeat POST to update hours on the same day.
+     */
+    public function storeOrUpdate(TimeEntryStoreRequest $request)
+    {
+        $row = $this->service->createOrUpdate($request->validated());
+        return new TimeEntryResource($row);
+    }
+
     public function show(string $id)
     {
         $row = $this->service->getTimeEntryById($id);
@@ -101,4 +111,3 @@ class TimeEntryController extends Controller
         return response()->json(['user_id' => (int)$userId, 'total_hours' => (float)$total]);
     }
 }
-

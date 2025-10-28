@@ -19,6 +19,7 @@ class TaskBaseline extends Model
         'end_planned_base',
         'duration_planned_base',
         'weight',
+        'planned_effort_hours',
     ];
 
     /**
@@ -31,6 +32,7 @@ class TaskBaseline extends Model
             'end_planned_base' => 'date',
             'duration_planned_base' => 'integer',
             'weight' => 'decimal:2',
+            'planned_effort_hours' => 'decimal:2',
         ];
     }
 

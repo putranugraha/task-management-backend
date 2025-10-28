@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\ProjectBaseline;
 use App\Repositories\Contracts\TaskBaselineRepositoryInterface;
 use App\Services\Contracts\TaskBaselineServiceInterface;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -70,15 +71,56 @@ class TaskBaselineService implements TaskBaselineServiceInterface
                 $baselineId = $latestBaseline->id ?? null;
             }
 
+            // Inclusive duration helper
+            $inclusiveDuration = function ($start, $end) {
+                if (!$start || !$end) {
+                    return null;
+                }
+                try {
+                    $s = Carbon::parse($start);
+                    $e = Carbon::parse($end);
+                    $days = $s->diffInDays($e) + 1; // inclusive
+                    return max(1, (int) $days);
+                } catch (\Throwable $t) {
+                    return null;
+                }
+            };
+
+            $startBase = $data['start_planned_base'] ?? $task->start_planned;
+            $endBase = $data['end_planned_base'] ?? $task->end_planned;
+            $durationBase = $data['duration_planned_base']
+                ?? ($task->duration_planned ?? null);
+
+            if (empty($durationBase)) {
+                $durationBase = $inclusiveDuration($startBase, $endBase);
+            }
+            if (!empty($durationBase)) {
+                $durationBase = max(1, (int) $durationBase);
+            }
+
+            // Default weight = 1 if empty or 0
+            $weight = $data['weight'] ?? null;
+            if ($weight === null || (is_numeric($weight) && (float) $weight == 0.0)) {
+                $weight = 1;
+            }
+
+            // Planned effort hours default = duration × 8 if not provided
+            $plannedEffort = $data['planned_effort_hours'] ?? null;
+            if ($plannedEffort === null && !empty($durationBase)) {
+                $plannedEffort = (float) $durationBase * 8.0;
+            }
+
             $baselineData = [
                 'baseline_id' => $baselineId,
                 'task_id' => $task->id,
-                'start_planned_base' => $data['start_planned_base'] ?? $task->start_planned,
-                'end_planned_base' => $data['end_planned_base'] ?? $task->end_planned,
-                'duration_planned_base' => $data['duration_planned_base'] ?? $task->duration_planned,
-                'weight' => $data['weight'] ?? null,
+                'start_planned_base' => $startBase,
+                'end_planned_base' => $endBase,
+                'duration_planned_base' => $durationBase,
+                'weight' => $weight,
+                'planned_effort_hours' => $plannedEffort,
             ];
 
+            // Upsert by unique key (baseline_id, task_id)
             $taskBaseline = $this->repository->createTaskBaseline($baselineData);
             $this->clearCaches(
                 $taskBaseline->id ?? null,
