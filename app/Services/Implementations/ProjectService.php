@@ -3,13 +3,17 @@
 namespace App\Services\Implementations;
 
 use App\Repositories\Contracts\ProjectRepositoryInterface;
+use App\Services\Contracts\ProjectBaselineServiceInterface;
 use App\Services\Contracts\ProjectServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class ProjectService implements ProjectServiceInterface
 {
     /** @var ProjectRepositoryInterface */
     protected $repository;
+
+    protected ProjectBaselineServiceInterface $baselineService;
 
     const CACHE_ALL = 'projects.all';
     const CACHE_STATUS_PREFIX = 'projects.status.'; // + status
@@ -19,9 +23,10 @@ class ProjectService implements ProjectServiceInterface
     // Allowed statuses for validation at service layer
     const ALLOWED_STATUSES = ['Planned', 'In Progress', 'Completed', 'On Hold', 'Cancelled'];
 
-    public function __construct(ProjectRepositoryInterface $repository)
+    public function __construct(ProjectRepositoryInterface $repository, ProjectBaselineServiceInterface $baselineService)
     {
         $this->repository = $repository;
+        $this->baselineService = $baselineService;
     }
 
     public function getAllProjects()
@@ -69,6 +74,17 @@ class ProjectService implements ProjectServiceInterface
     {
         $project = $this->repository->createProject($data);
         $this->clearCaches();
+
+        // Auto-create initial baseline so FE doesn't need extra call
+        if ($project) {
+            $this->baselineService->createBaseline([
+                'project_id' => $project->id,
+                'baseline_name' => 'Initial Baseline',
+                'taken_at' => Carbon::now(),
+                // start/end base will be computed by service if not provided
+            ]);
+        }
+
         return $project;
     }
 
@@ -107,4 +123,3 @@ class ProjectService implements ProjectServiceInterface
         }
     }
 }
-

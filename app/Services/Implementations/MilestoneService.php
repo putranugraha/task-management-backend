@@ -4,12 +4,15 @@ namespace App\Services\Implementations;
 
 use App\Repositories\Contracts\MilestoneRepositoryInterface;
 use App\Services\Contracts\MilestoneServiceInterface;
+use App\Services\Contracts\ProjectBaselineServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class MilestoneService implements MilestoneServiceInterface
 {
     /** @var MilestoneRepositoryInterface */
     protected $repository;
+    protected ProjectBaselineServiceInterface $baselineService;
 
     const CACHE_ALL = 'milestones.all';
     const CACHE_ID_PREFIX = 'milestone.';
@@ -19,9 +22,10 @@ class MilestoneService implements MilestoneServiceInterface
 
     const ALLOWED_STATUSES = ['Planned', 'In Progress', 'Completed', 'Overdue', 'On Hold'];
 
-    public function __construct(MilestoneRepositoryInterface $repository)
+    public function __construct(MilestoneRepositoryInterface $repository, ProjectBaselineServiceInterface $baselineService)
     {
         $this->repository = $repository;
+        $this->baselineService = $baselineService;
     }
 
     public function getAllMilestones()
@@ -53,6 +57,19 @@ class MilestoneService implements MilestoneServiceInterface
     {
         $ms = $this->repository->createMilestone($data);
         $this->clearCaches($ms->project_id ?? null, $ms->status ?? null, $ms->id ?? null);
+
+        // Ensure project has at least one baseline so FE doesn't need to manage it
+        if ($ms && $ms->project_id) {
+            $latest = $this->baselineService->getLatestBaselineByProject($ms->project_id);
+            if (!$latest) {
+                $this->baselineService->createBaseline([
+                    'project_id' => $ms->project_id,
+                    'baseline_name' => 'Initial Baseline',
+                    'taken_at' => Carbon::now(),
+                ]);
+            }
+        }
+
         return $ms;
     }
 
@@ -94,4 +111,3 @@ class MilestoneService implements MilestoneServiceInterface
         if ($id) Cache::forget(self::CACHE_ID_PREFIX.$id);
     }
 }
-
