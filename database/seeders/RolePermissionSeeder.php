@@ -24,8 +24,13 @@ class RolePermissionSeeder extends Seeder
             'mengelola permissions',
             'mengelola project',
             'mengelola tugas',
+            'mengelola tugas sendiri',
+            'mengisi entri waktu',
+            'mengelola komentar',
+            'mengelola lampiran',
             'melihat project',
             'melihat tugas',
+            'melihat laporan pribadi',
             'mencetak laporan',
         ];
 
@@ -54,6 +59,11 @@ class RolePermissionSeeder extends Seeder
         $member->syncPermissions([
             Permission::where('name', 'melihat project')->first(),
             Permission::where('name', 'melihat tugas')->first(),
+            Permission::where('name', 'mengelola tugas sendiri')->first(),
+            Permission::where('name', 'mengisi entri waktu')->first(),
+            Permission::where('name', 'mengelola komentar')->first(),
+            Permission::where('name', 'mengelola lampiran')->first(),
+            Permission::where('name', 'melihat laporan pribadi')->first(),
         ]);
     }
 }

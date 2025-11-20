@@ -43,12 +43,29 @@ class AuthController extends Controller
 
         $user->loadMissing('division', 'roles');
 
+        $primaryRole = $user->roles->first()->name ?? null;
+        $dashboardType = match ($primaryRole) {
+            'Admin' => 'admin',
+            'Manager' => 'manager',
+            'Member' => 'member',
+            default => 'member',
+        };
+        $homePath = match ($dashboardType) {
+            'admin' => '/admin/dashboard',
+            'manager' => '/manager/dashboard',
+            'member' => '/member/dashboard',
+            default => '/dashboard',
+        };
+
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
 
         return response()->json([
             'user' => new UserResource($user),
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            'primary_role' => $primaryRole,
+            'dashboard_type' => $dashboardType,
+            'home_path' => $homePath,
             'token' => $token,
             'message' => 'Login berhasil',
         ], 200);

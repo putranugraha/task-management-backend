@@ -35,10 +35,26 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Profile
     Route::get('/profile', function (Request $request) {
         $user = $request->user();
+        $primaryRole = $user->roles->first()->name ?? null;
+        $dashboardType = match ($primaryRole) {
+            'Admin' => 'admin',
+            'Manager' => 'manager',
+            'Member' => 'member',
+            default => 'member',
+        };
+        $homePath = match ($dashboardType) {
+            'admin' => '/admin/dashboard',
+            'manager' => '/manager/dashboard',
+            'member' => '/member/dashboard',
+            default => '/dashboard',
+        };
         return response()->json([
             'user' => $user, // Optionally wrap with Resource
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            'primary_role' => $primaryRole,
+            'dashboard_type' => $dashboardType,
+            'home_path' => $homePath,
         ]);
     });
 
