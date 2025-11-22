@@ -229,6 +229,12 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     Route::post('time-entries/upsert', [TimeEntryController::class, 'storeOrUpdate']);
 });
 
+// Log time entries for own tasks (simplified via nested routes)
+Route::middleware(['auth:sanctum', 'active', 'permission:mengisi entri waktu'])->group(function () {
+    Route::post('tasks/{task}/time-entries', [TimeEntryController::class, 'storeForTask']);
+    Route::post('tasks/{task}/time-entries/upsert', [TimeEntryController::class, 'storeOrUpdateForTask']);
+});
+
 // Comments API
 // Read-only
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
@@ -258,8 +264,11 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 });
 
 // Manage attachments
-Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola lampiran'])->group(function () {
     Route::apiResource('attachments', AttachmentController::class)->only(['store','update','destroy']);
+    Route::post('tasks/{task}/attachments', [AttachmentController::class, 'storeForTask']);
+    Route::patch('attachments/{attachment}/approve', [AttachmentController::class, 'approve']);
+    Route::patch('attachments/{attachment}/reject', [AttachmentController::class, 'reject']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
 

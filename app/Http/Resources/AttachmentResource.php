@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class AttachmentResource extends JsonResource
 {
@@ -18,7 +19,17 @@ class AttachmentResource extends JsonResource
             'mime' => $this->mime,
             'storage_path' => $this->storage_path,
             'size' => (int) $this->size,
+            'url' => $this->storage_path ? Storage::disk('public')->url($this->storage_path) : null,
             'uploaded_at' => optional($this->uploaded_at)->toDateTimeString(),
+            'status' => $this->status,
+            'verified_at' => optional($this->verified_at)->toDateTimeString(),
+            'verified_by' => $this->whenLoaded('verifier', function () {
+                return [
+                    'id' => $this->verifier->id,
+                    'name' => $this->verifier->name,
+                    'email' => $this->verifier->email,
+                ];
+            }),
             'entity' => $this->whenLoaded('entity', function () {
                 return [
                     'type' => class_basename($this->entity),
@@ -37,4 +48,3 @@ class AttachmentResource extends JsonResource
         ];
     }
 }
-

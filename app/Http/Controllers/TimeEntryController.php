@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Requests\TimeEntryStoreRequest;
 use App\Http\Requests\TimeEntryUpdateRequest;
+use App\Http\Requests\TaskTimeEntryStoreRequest;
 use App\Http\Resources\TimeEntryResource;
+use App\Models\Task;
 use App\Services\Contracts\TimeEntryServiceInterface;
 
 class TimeEntryController extends Controller
@@ -63,12 +65,54 @@ class TimeEntryController extends Controller
     }
 
     /**
+     * Create a time entry for a specific Task for the authenticated user.
+     * Route: POST /tasks/{task}/time-entries
+     */
+    public function storeForTask(Task $task, TaskTimeEntryStoreRequest $request)
+    {
+        $userId = $request->user()?->id;
+        if (!$userId) {
+            return response()->json(['message' => 'User tidak terautentik'], 401);
+        }
+
+        $data = $request->validated();
+        $data['task_id'] = $task->id;
+        $data['user_id'] = $userId;
+
+        $row = $this->service->createTimeEntry($data);
+        if (!$row) {
+            return response()->json(['message' => 'Gagal membuat time entry (mungkin duplikat tanggal untuk user/task).'], 400);
+        }
+
+        return new TimeEntryResource($row);
+    }
+
+    /**
      * Upsert time entry by (task_id, user_id, date).
      * Simplifies FE flow: repeat POST to update hours on the same day.
      */
     public function storeOrUpdate(TimeEntryStoreRequest $request)
     {
         $row = $this->service->createOrUpdate($request->validated());
+        return new TimeEntryResource($row);
+    }
+
+    /**
+     * Upsert time entry by (task_id, user_id, date) for a specific Task.
+     * Route: POST /tasks/{task}/time-entries/upsert
+     */
+    public function storeOrUpdateForTask(Task $task, TaskTimeEntryStoreRequest $request)
+    {
+        $userId = $request->user()?->id;
+        if (!$userId) {
+            return response()->json(['message' => 'User tidak terautentik'], 401);
+        }
+
+        $data = $request->validated();
+        $data['task_id'] = $task->id;
+        $data['user_id'] = $userId;
+
+        $row = $this->service->createOrUpdate($data);
         return new TimeEntryResource($row);
     }
 

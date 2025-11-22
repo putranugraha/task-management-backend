@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\AttachmentStoreRequest;
 use App\Http\Requests\AttachmentUpdateRequest;
+use App\Http\Requests\AttachmentUploadRequest;
 use App\Http\Resources\AttachmentResource;
+use App\Models\Task;
 use App\Services\Contracts\AttachmentServiceInterface;
 
 class AttachmentController extends Controller
@@ -64,6 +67,35 @@ class AttachmentController extends Controller
         return new AttachmentResource($row);
     }
 
+    /**
+     * Upload a file and create an attachment for a specific Task.
+     * Route: POST /tasks/{task}/attachments
+     */
+    public function storeForTask(Task $task, AttachmentUploadRequest $request)
+    {
+        $file = $request->file('file');
+
+        // Store file on the configured public disk under attachments/Y/m
+        $directory = 'attachments/'.now()->format('Y/m');
+        $storedPath = $file->store($directory, 'public');
+
+        $data = [
+            'entity_type' => 'Task',
+            'entity_id' => $task->id,
+            'uploaded_by' => $request->user()?->id,
+            'filename' => $file->getClientOriginalName(),
+            'mime' => $file->getClientMimeType(),
+            'storage_path' => $storedPath,
+            'size' => $file->getSize(),
+            'uploaded_at' => now(),
+        ];
+
+        $row = $this->service->createAttachment($data);
+        if (!$row) return response()->json(['message' => 'Gagal mengunggah attachment'], 400);
+
+        return new AttachmentResource($row);
+    }
+
     public function show(string $id)
     {
         $row = $this->service->getAttachmentById($id);
@@ -91,6 +123,54 @@ class AttachmentController extends Controller
         return response()->json(['message' => 'Attachment berhasil dihapus']);
     }
 
+    /**
+     * Approve an attachment (mark as verified by current user).
+     * Route: PATCH /attachments/{attachment}/approve
+     */
+    public function approve(string $id, Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'User tidak terautentik'], 401);
+        }
+
+        $row = $this->service->updateAttachment($id, [
+            'status' => 'Approved',
+            'verified_by' => $user->id,
+            'verified_at' => now(),
+        ]);
+
+        if (!$row) {
+            return response()->json(['message' => 'Attachment tidak ditemukan atau gagal di-approve'], 404);
+        }
+
+        return new AttachmentResource($row->loadMissing('verifier'));
+    }
+
+    /**
+     * Reject an attachment (mark as rejected by current user).
+     * Route: PATCH /attachments/{attachment}/reject
+     */
+    public function reject(string $id, Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'User tidak terautentik'], 401);
+        }
+
+        $row = $this->service->updateAttachment($id, [
+            'status' => 'Rejected',
+            'verified_by' => $user->id,
+            'verified_at' => now(),
+        ]);
+
+        if (!$row) {
+            return response()->json(['message' => 'Attachment tidak ditemukan atau gagal di-reject'], 404);
+        }
+
+        return new AttachmentResource($row->loadMissing('verifier'));
+    }
+
     public function destroyByEntity(Request $request)
     {
         $request->validate([
@@ -116,4 +196,3 @@ class AttachmentController extends Controller
         ]);
     }
 }
-

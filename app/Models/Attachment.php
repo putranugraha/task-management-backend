@@ -18,6 +18,9 @@ class Attachment extends Model
         'storage_path',
         'size',
         'uploaded_at',
+        'status',
+        'verified_by',
+        'verified_at',
     ];
 
     protected function casts(): array
@@ -25,6 +28,7 @@ class Attachment extends Model
         return [
             'uploaded_at' => 'datetime',
             'size' => 'integer',
+            'verified_at' => 'datetime',
         ];
     }
 
@@ -37,5 +41,9 @@ class Attachment extends Model
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
-}
 
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+}
