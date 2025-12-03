@@ -3,6 +3,7 @@
 namespace App\Services\Implementations;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
 use App\Services\Contracts\UserServiceInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 
@@ -96,6 +97,46 @@ class UserService implements UserServiceInterface
         }
 
         $this->clearUserCaches();
+
+        if ($user) {
+            $actor = Auth::user();
+
+            $properties = [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'division_id' => $user->division_id,
+                'status' => $user->status,
+                'is_active' => $user->is_active,
+            ];
+
+            $activity = activity('users')
+                ->performedOn($user)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+
+            if ($role) {
+                $roleActivity = activity('roles')
+                    ->performedOn($user)
+                    ->withProperties([
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'role' => $role,
+                        'action' => 'assigned_on_create',
+                    ]);
+
+                if ($actor) {
+                    $roleActivity->causedBy($actor);
+                }
+
+                $roleActivity->log('role_assigned');
+            }
+        }
+
         return $user;
     }
 
@@ -103,6 +144,8 @@ class UserService implements UserServiceInterface
     {
         $role = $data['role'] ?? null;
         unset($data['role']);
+
+        $before = $this->userRepository->getUserById($id);
 
         if (empty($data['password'])) {
             unset($data['password'], $data['password_confirmation']);
@@ -130,24 +173,119 @@ class UserService implements UserServiceInterface
         }
 
         $this->clearUserCaches($id);
+
+        if ($user) {
+            $actor = Auth::user();
+
+            $properties = [
+                'user_id' => $user->id,
+                'email_before' => $before->email ?? null,
+                'email_after' => $user->email,
+                'division_id_before' => $before->division_id ?? null,
+                'division_id_after' => $user->division_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $user->status,
+                'is_active_before' => $before->is_active ?? null,
+                'is_active_after' => $user->is_active,
+            ];
+
+            $activity = activity('users')
+                ->performedOn($user)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+
+            if ($role) {
+                $oldRoles = $before ? $before->getRoleNames()->toArray() : [];
+                $newRoles = $user->getRoleNames()->toArray();
+
+                $roleActivity = activity('roles')
+                    ->performedOn($user)
+                    ->withProperties([
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'old_roles' => $oldRoles,
+                        'new_roles' => $newRoles,
+                        'action' => 'updated',
+                    ]);
+
+                if ($actor) {
+                    $roleActivity->causedBy($actor);
+                }
+
+                $roleActivity->log('role_changed');
+            }
+        }
+
         return $user;
     }
 
     public function deleteUser($id)
     {
+        $user = $this->userRepository->getUserById($id);
         $result = $this->userRepository->deleteUser($id);
+
         if ($result) {
             $this->clearUserCaches($id);
+
+            if ($user) {
+                $actor = Auth::user();
+
+                $properties = [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'division_id' => $user->division_id,
+                    'status' => $user->status,
+                    'is_active' => $user->is_active,
+                    'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames()->toArray() : [],
+                ];
+
+                $activity = activity('users')
+                    ->performedOn($user)
+                    ->withProperties($properties);
+
+                if ($actor) {
+                    $activity->causedBy($actor);
+                }
+
+                $activity->log('deleted');
+            }
         }
+
         return $result;
     }
 
     public function updateUserStatus($id, $status)
     {
+        $before = $this->userRepository->getUserById($id);
         $user = $this->userRepository->updateUserStatus($id, $status);
 
         if ($user) {
             $this->clearUserCaches($id);
+
+            $actor = Auth::user();
+
+            $properties = [
+                'user_id' => $user->id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $user->status,
+                'is_active_before' => $before->is_active ?? null,
+                'is_active_after' => $user->is_active,
+            ];
+
+            $activity = activity('users')
+                ->performedOn($user)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('status_changed');
         }
 
         return $user;

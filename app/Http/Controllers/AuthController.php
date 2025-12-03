@@ -59,6 +59,14 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
 
+        activity('auth')
+            ->causedBy($user)
+            ->withProperties([
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ])
+            ->log('login');
+
         return response()->json([
             'user' => new UserResource($user),
             'roles' => $user->getRoleNames(),
@@ -106,8 +114,20 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        if ($request->user() && method_exists($request->user(), 'currentAccessToken')) {
-            $request->user()->currentAccessToken()?->delete();
+        $user = $request->user();
+
+        if ($user && method_exists($user, 'currentAccessToken')) {
+            $user->currentAccessToken()?->delete();
+        }
+
+        if ($user) {
+            activity('auth')
+                ->causedBy($user)
+                ->withProperties([
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ])
+                ->log('logout');
         }
 
         if ($request->hasSession()) {

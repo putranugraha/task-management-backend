@@ -6,6 +6,7 @@ use App\Repositories\Contracts\ProjectRepositoryInterface;
 use App\Services\Contracts\ProjectBaselineServiceInterface;
 use App\Services\Contracts\ProjectServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class ProjectService implements ProjectServiceInterface
@@ -83,6 +84,27 @@ class ProjectService implements ProjectServiceInterface
                 'taken_at' => Carbon::now(),
                 // start/end base will be computed by service if not provided
             ]);
+
+            $actor = Auth::user();
+
+            $properties = [
+                'project_id' => $project->id,
+                'name' => $project->name,
+                'client_name' => $project->client_name,
+                'division_owner_id' => $project->division_owner_id,
+                'status' => $project->status,
+                'value_amount' => $project->value_amount,
+            ];
+
+            $activity = activity('projects')
+                ->performedOn($project)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
         }
 
         return $project;
@@ -90,15 +112,71 @@ class ProjectService implements ProjectServiceInterface
 
     public function updateProject($id, array $data)
     {
+        $before = $this->repository->getProjectById($id);
+
         $project = $this->repository->updateProject($id, $data);
         $this->clearCaches($id, $project->status ?? null);
+
+        if ($project) {
+            $actor = Auth::user();
+
+            $properties = [
+                'project_id' => $project->id,
+                'name_before' => $before->name ?? null,
+                'name_after' => $project->name,
+                'client_name_before' => $before->client_name ?? null,
+                'client_name_after' => $project->client_name,
+                'division_owner_id_before' => $before->division_owner_id ?? null,
+                'division_owner_id_after' => $project->division_owner_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $project->status,
+                'value_amount_before' => $before->value_amount ?? null,
+                'value_amount_after' => $project->value_amount,
+            ];
+
+            $activity = activity('projects')
+                ->performedOn($project)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+        }
+
         return $project;
     }
 
     public function deleteProject($id)
     {
+        $project = $this->repository->getProjectById($id);
         $result = $this->repository->deleteProject($id);
         $this->clearCaches($id);
+
+        if ($result && $project) {
+            $actor = Auth::user();
+
+            $properties = [
+                'project_id' => $project->id,
+                'name' => $project->name,
+                'client_name' => $project->client_name,
+                'division_owner_id' => $project->division_owner_id,
+                'status' => $project->status,
+                'value_amount' => $project->value_amount,
+            ];
+
+            $activity = activity('projects')
+                ->performedOn($project)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 
@@ -107,8 +185,31 @@ class ProjectService implements ProjectServiceInterface
         if (!in_array($status, self::ALLOWED_STATUSES)) {
             return null;
         }
+
+        $before = $this->repository->getProjectById($id);
         $project = $this->repository->updateProjectStatus($id, $status);
         $this->clearCaches($id, $status);
+
+        if ($project) {
+            $actor = Auth::user();
+
+            $properties = [
+                'project_id' => $project->id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $project->status,
+            ];
+
+            $activity = activity('projects')
+                ->performedOn($project)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('status_changed');
+        }
+
         return $project;
     }
 

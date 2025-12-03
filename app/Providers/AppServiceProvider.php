@@ -8,6 +8,8 @@ use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use Spatie\Permission\Models\Role as SpatieRole;
+use Spatie\Permission\Models\Permission as SpatiePermission;
 use App\Repositories\Contracts\AttachmentRepositoryInterface;
 use App\Repositories\Contracts\CommentRepositoryInterface;
 use App\Repositories\Contracts\DivisionRepositoryInterface;
@@ -153,6 +155,8 @@ class AppServiceProvider extends ServiceProvider
             'Project' => Project::class,
             'Milestone' => Milestone::class,
             'User' => User::class,
+            'SpatieRole' => SpatieRole::class,
+            'SpatiePermission' => SpatiePermission::class,
         ]);
     }
 }
