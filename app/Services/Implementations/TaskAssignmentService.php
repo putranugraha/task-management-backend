@@ -5,6 +5,8 @@ namespace App\Services\Implementations;
 use App\Repositories\Contracts\TaskAssignmentRepositoryInterface;
 use App\Services\Contracts\TaskAssignmentServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
+use App\Models\TaskAssignment;
 
 class TaskAssignmentService implements TaskAssignmentServiceInterface
 {
@@ -50,13 +52,63 @@ class TaskAssignmentService implements TaskAssignmentServiceInterface
     {
         $assignment = $this->repository->createAssignment($data);
         $this->clearCaches($assignment->id ?? null, $assignment->task_id ?? null, $assignment->user_id ?? null);
+
+        if ($assignment) {
+            $actor = Auth::user();
+
+            $properties = [
+                'assignment_id' => $assignment->id,
+                'task_id' => $assignment->task_id,
+                'user_id' => $assignment->user_id,
+                'role_on_task' => $assignment->role_on_task,
+                'estimated_effort_hours' => $assignment->estimated_effort_hours,
+                'assigned_at' => $assignment->assigned_at,
+            ];
+
+            $activity = activity('assignments')
+                ->performedOn($assignment instanceof TaskAssignment ? $assignment : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+        }
+
         return $assignment;
     }
 
     public function updateAssignment($id, array $data)
     {
+        $before = $this->repository->getAssignmentById($id);
         $assignment = $this->repository->updateAssignment($id, $data);
         $this->clearCaches($id, $assignment->task_id ?? null, $assignment->user_id ?? null);
+
+        if ($assignment) {
+            $actor = Auth::user();
+
+            $properties = [
+                'assignment_id' => $assignment->id,
+                'task_id' => $assignment->task_id,
+                'user_id' => $assignment->user_id,
+                'role_on_task_before' => $before->role_on_task ?? null,
+                'role_on_task_after' => $assignment->role_on_task,
+                'estimated_effort_hours_before' => $before->estimated_effort_hours ?? null,
+                'estimated_effort_hours_after' => $assignment->estimated_effort_hours,
+            ];
+
+            $activity = activity('assignments')
+                ->performedOn($assignment instanceof TaskAssignment ? $assignment : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+        }
+
         return $assignment;
     }
 
@@ -65,20 +117,77 @@ class TaskAssignmentService implements TaskAssignmentServiceInterface
         $assignment = $this->getAssignmentById($id);
         $result = $this->repository->deleteAssignment($id);
         $this->clearCaches($id, $assignment->task_id ?? null, $assignment->user_id ?? null);
+
+        if ($result && $assignment) {
+            $actor = Auth::user();
+
+            $properties = [
+                'assignment_id' => $assignment->id,
+                'task_id' => $assignment->task_id,
+                'user_id' => $assignment->user_id,
+                'role_on_task' => $assignment->role_on_task,
+                'estimated_effort_hours' => $assignment->estimated_effort_hours,
+            ];
+
+            $activity = activity('assignments')
+                ->performedOn($assignment instanceof TaskAssignment ? $assignment : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 
     public function deleteAssignmentsByTask($taskId)
     {
+        $actor = Auth::user();
+
         $result = $this->repository->deleteAssignmentsByTask($taskId);
         $this->clearCaches(null, $taskId, null);
+
+        if ($result) {
+            $activity = activity('assignments')
+                ->withProperties([
+                    'task_id' => $taskId,
+                    'action' => 'delete_by_task',
+                ]);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('bulk_deleted');
+        }
+
         return $result;
     }
 
     public function deleteAssignmentsByUser($userId)
     {
+        $actor = Auth::user();
+
         $result = $this->repository->deleteAssignmentsByUser($userId);
         $this->clearCaches(null, null, $userId);
+
+        if ($result) {
+            $activity = activity('assignments')
+                ->withProperties([
+                    'user_id' => $userId,
+                    'action' => 'delete_by_user',
+                ]);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('bulk_deleted');
+        }
+
         return $result;
     }
 
@@ -90,4 +199,3 @@ class TaskAssignmentService implements TaskAssignmentServiceInterface
         if ($userId) Cache::forget(self::CACHE_USER_PREFIX.$userId);
     }
 }
-

@@ -5,6 +5,8 @@ namespace App\Services\Implementations;
 use App\Repositories\Contracts\TimeEntryRepositoryInterface;
 use App\Services\Contracts\TimeEntryServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
+use App\Models\TimeEntry;
 
 class TimeEntryService implements TimeEntryServiceInterface
 {
@@ -60,6 +62,30 @@ class TimeEntryService implements TimeEntryServiceInterface
         $data = $this->appendProgressToNote($data);
         $row = $this->repository->createTimeEntry($data);
         $this->clearCaches($row->id ?? null, $row->task_id ?? null, $row->user_id ?? null);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'time_entry_id' => $row->id,
+                'task_id' => $row->task_id,
+                'user_id' => $row->user_id,
+                'date' => $row->date,
+                'hours' => $row->hours,
+                'note' => $row->note,
+            ];
+
+            $activity = activity('time_entries')
+                ->performedOn($row instanceof TimeEntry ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+        }
+
         return $row;
     }
 
@@ -76,7 +102,12 @@ class TimeEntryService implements TimeEntryServiceInterface
         $hours = $data['hours'];
         $note = ($this->appendProgressToNote($data)['note'] ?? ($data['note'] ?? null));
 
-        $row = \App\Models\TimeEntry::updateOrCreate(
+        $before = TimeEntry::where('task_id', $taskId)
+            ->where('user_id', $userId)
+            ->where('date', $date)
+            ->first();
+
+        $row = TimeEntry::updateOrCreate(
             [
                 'task_id' => $taskId,
                 'user_id' => $userId,
@@ -89,14 +120,67 @@ class TimeEntryService implements TimeEntryServiceInterface
         );
 
         $this->clearCaches($row->id ?? null, $taskId, $userId);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'time_entry_id' => $row->id,
+                'task_id' => $row->task_id,
+                'user_id' => $row->user_id,
+                'date' => $row->date,
+                'hours_before' => $before->hours ?? null,
+                'hours_after' => $row->hours,
+                'note_before' => $before->note ?? null,
+                'note_after' => $row->note,
+            ];
+
+            $activity = activity('time_entries')
+                ->performedOn($row instanceof TimeEntry ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log($before ? 'upsert_updated' : 'upsert_created');
+        }
+
         return $row;
     }
 
     public function updateTimeEntry($id, array $data)
     {
         $data = $this->appendProgressToNote($data);
+        $before = $this->repository->getTimeEntryById($id);
         $row = $this->repository->updateTimeEntry($id, $data);
         $this->clearCaches($id, $row->task_id ?? null, $row->user_id ?? null);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'time_entry_id' => $row->id,
+                'task_id' => $row->task_id,
+                'user_id' => $row->user_id,
+                'date' => $row->date,
+                'hours_before' => $before->hours ?? null,
+                'hours_after' => $row->hours,
+                'note_before' => $before->note ?? null,
+                'note_after' => $row->note,
+            ];
+
+            $activity = activity('time_entries')
+                ->performedOn($row instanceof TimeEntry ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+        }
+
         return $row;
     }
 
@@ -105,6 +189,30 @@ class TimeEntryService implements TimeEntryServiceInterface
         $row = $this->repository->getTimeEntryById($id);
         $result = $this->repository->deleteTimeEntry($id);
         $this->clearCaches($id, $row->task_id ?? null, $row->user_id ?? null);
+
+        if ($result && $row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'time_entry_id' => $row->id,
+                'task_id' => $row->task_id,
+                'user_id' => $row->user_id,
+                'date' => $row->date,
+                'hours' => $row->hours,
+                'note' => $row->note,
+            ];
+
+            $activity = activity('time_entries')
+                ->performedOn($row instanceof TimeEntry ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 

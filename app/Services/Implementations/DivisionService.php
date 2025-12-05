@@ -5,6 +5,8 @@ namespace App\Services\Implementations;
 use App\Repositories\Contracts\DivisionRepositoryInterface;
 use App\Services\Contracts\DivisionServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Division;
 
 class DivisionService implements DivisionServiceInterface
 {
@@ -47,15 +49,57 @@ class DivisionService implements DivisionServiceInterface
         $division = $this->repository->createDivision($data);
         if ($division) {
             $this->clearCaches($division->id, $division->code, $division->name);
+
+            $actor = Auth::user();
+
+            $properties = [
+                'division_id' => $division->id,
+                'code' => $division->code,
+                'name' => $division->name,
+                'description' => $division->description,
+            ];
+
+            $activity = activity('divisions')
+                ->performedOn($division instanceof Division ? $division : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
         }
         return $division;
     }
 
     public function updateDivision($id, array $data)
     {
+        $before = $this->repository->getDivisionById($id);
         $division = $this->repository->updateDivision($id, $data);
         if ($division) {
             $this->clearCaches($id, $division->code, $division->name);
+
+            $actor = Auth::user();
+
+            $properties = [
+                'division_id' => $division->id,
+                'code_before' => $before->code ?? null,
+                'code_after' => $division->code,
+                'name_before' => $before->name ?? null,
+                'name_after' => $division->name,
+                'description_before' => $before->description ?? null,
+                'description_after' => $division->description,
+            ];
+
+            $activity = activity('divisions')
+                ->performedOn($division instanceof Division ? $division : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
         }
         return $division;
     }
@@ -66,6 +110,27 @@ class DivisionService implements DivisionServiceInterface
         $result = $this->repository->deleteDivision($id);
         if ($result) {
             $this->clearCaches($id, $division->code ?? null, $division->name ?? null);
+
+            if ($division) {
+                $actor = Auth::user();
+
+                $properties = [
+                    'division_id' => $division->id,
+                    'code' => $division->code,
+                    'name' => $division->name,
+                    'description' => $division->description,
+                ];
+
+                $activity = activity('divisions')
+                    ->performedOn($division instanceof Division ? $division : null)
+                    ->withProperties($properties);
+
+                if ($actor) {
+                    $activity->causedBy($actor);
+                }
+
+                $activity->log('deleted');
+            }
         }
         return $result;
     }

@@ -8,6 +8,8 @@ use App\Services\Contracts\TaskBaselineServiceInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use App\Models\StatusHistory;
+use App\Models\Task;
+use App\Models\Milestone;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -29,6 +31,12 @@ class TaskService implements TaskServiceInterface
     // Allowed statuses for tasks
     const ALLOWED_STATUSES = ['To Do', 'In Progress', 'Done', 'On Hold', 'Cancelled'];
     const ALLOWED_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
+    /**
+     * Statuses considered "done" for milestone auto-completion checks.
+     *
+     * @var list<string>
+     */
+    const DONE_STATUSES_FOR_MILESTONE = ['Done'];
 
     public function __construct(TaskRepositoryInterface $repository, TaskBaselineServiceInterface $taskBaselineService, ProjectBaselineServiceInterface $projectBaselineService)
     {
@@ -146,6 +154,31 @@ class TaskService implements TaskServiceInterface
         }
 
         $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
+
+        if ($task) {
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'milestone_id' => $task->milestone_id,
+                'title' => $task->title,
+                'priority' => $task->priority,
+                'status' => $task->status,
+                'percent_complete' => $task->percent_complete,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+        }
+
         return $task;
     }
 
@@ -155,6 +188,8 @@ class TaskService implements TaskServiceInterface
         $dependencies = $data['dependencies'] ?? null;
         unset($data['assignments']);
         unset($data['dependencies']);
+
+        $before = $this->repository->getTaskById($id);
 
         $task = null;
         DB::transaction(function () use (&$task, $id, $data, $assignments, $dependencies) {
@@ -204,6 +239,39 @@ class TaskService implements TaskServiceInterface
         }
 
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
+
+        if ($task) {
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id_before' => $before->project_id ?? null,
+                'project_id_after' => $task->project_id,
+                'milestone_id_before' => $before->milestone_id ?? null,
+                'milestone_id_after' => $task->milestone_id,
+                'title_before' => $before->title ?? null,
+                'title_after' => $task->title,
+                'priority_before' => $before->priority ?? null,
+                'priority_after' => $task->priority,
+                'status_before' => $before->status ?? null,
+                'status_after' => $task->status,
+                'percent_complete_before' => $before->percent_complete ?? null,
+                'percent_complete_after' => $task->percent_complete,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+
+            $this->syncMilestoneCompletion($task);
+        }
+
         return $task;
     }
 
@@ -212,6 +280,31 @@ class TaskService implements TaskServiceInterface
         $task = $this->getTaskById($id);
         $result = $this->repository->deleteTask($id);
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
+
+        if ($result && $task) {
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'milestone_id' => $task->milestone_id,
+                'title' => $task->title,
+                'priority' => $task->priority,
+                'status' => $task->status,
+                'percent_complete' => $task->percent_complete,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 
@@ -228,13 +321,37 @@ class TaskService implements TaskServiceInterface
             $task->milestone_id ?? null,
         );
         if ($task) {
+            $changedBy = Auth::id();
+
             StatusHistory::create([
                 'task_id' => $task->id,
                 'from_status' => $before->status ?? null,
                 'to_status' => $task->status,
-                'changed_by' => Auth::id(),
+                'changed_by' => $changedBy,
                 'note' => null,
             ]);
+
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'milestone_id' => $task->milestone_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $task->status,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('status_changed');
+
+            $this->syncMilestoneCompletion($task);
         }
         return $task;
     }
@@ -242,6 +359,8 @@ class TaskService implements TaskServiceInterface
     public function updateTaskProgress($id, $percent)
     {
         if (!is_numeric($percent) || $percent < 0 || $percent > 100) return null;
+
+        $before = $this->getTaskById($id);
         $task = $this->repository->updateTaskProgress($id, (int) $percent);
         $this->clearCaches(
             $id,
@@ -250,6 +369,29 @@ class TaskService implements TaskServiceInterface
             $task->priority ?? null,
             $task->milestone_id ?? null,
         );
+
+        if ($task) {
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'milestone_id' => $task->milestone_id,
+                'percent_complete_before' => $before->percent_complete ?? null,
+                'percent_complete_after' => $task->percent_complete,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('progress_updated');
+        }
+
         return $task;
     }
 
@@ -272,8 +414,96 @@ class TaskService implements TaskServiceInterface
                 'changed_by' => Auth::id(),
                 'note' => 'Completed via action',
             ]);
+
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'milestone_id' => $task->milestone_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $task->status,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('completed');
+
+            $this->syncMilestoneCompletion($task);
         }
         return $task;
+    }
+
+    /**
+     * Automatically sync milestone status based on all its tasks.
+     *
+     * - If all tasks in the milestone are in a "done" status, mark milestone as Completed.
+     * - If milestone is Completed but there is at least one non-done task, reopen it to In Progress.
+     */
+    protected function syncMilestoneCompletion(?Task $task): void
+    {
+        if (!$task || !$task->milestone_id) {
+            return;
+        }
+
+        $milestoneId = $task->milestone_id;
+
+        $milestone = Milestone::find($milestoneId);
+        if (!$milestone) {
+            return;
+        }
+
+        $remaining = Task::where('milestone_id', $milestoneId)
+            ->whereNotIn('status', self::DONE_STATUSES_FOR_MILESTONE)
+            ->count();
+
+        if ($remaining === 0) {
+            if ($milestone->status !== 'Completed') {
+                $endActualMax = Task::where('milestone_id', $milestoneId)->max('end_actual');
+                $endPlannedMax = Task::where('milestone_id', $milestoneId)->max('end_planned');
+
+                if ($endActualMax) {
+                    $milestone->due_actual = $endActualMax;
+                } elseif ($endPlannedMax) {
+                    $milestone->due_actual = $endPlannedMax;
+                } elseif (!$milestone->due_actual) {
+                    $milestone->due_actual = Carbon::now();
+                }
+
+                $milestone->status = 'Completed';
+                $milestone->save();
+                $this->clearMilestoneCaches($milestone);
+            }
+        } else {
+            if ($milestone->status === 'Completed') {
+                $milestone->status = 'In Progress';
+                $milestone->save();
+                $this->clearMilestoneCaches($milestone);
+            }
+        }
+    }
+
+    /**
+     * Clear milestone-related caches when its status changes.
+     *
+     * Mirrors the keys used in MilestoneService without changing its structure.
+     */
+    protected function clearMilestoneCaches(Milestone $milestone): void
+    {
+        Cache::forget('milestones.all');
+        if ($milestone->project_id) {
+            Cache::forget('milestones.project.'.$milestone->project_id);
+        }
+        if ($milestone->status) {
+            Cache::forget('milestones.status.'.$milestone->status);
+        }
+        Cache::forget('milestone.'.$milestone->id);
     }
 
     protected function clearCaches($id = null, $status = null, $projectId = null, $priority = null, $milestoneId = null): void

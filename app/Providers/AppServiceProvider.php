@@ -8,6 +8,11 @@ use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\TimeEntry;
+use App\Models\TaskAssignment;
+use App\Models\Comment;
+use App\Models\Attachment;
+use App\Models\TaskDependency;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 use App\Repositories\Contracts\AttachmentRepositoryInterface;
@@ -155,6 +160,11 @@ class AppServiceProvider extends ServiceProvider
             'Project' => Project::class,
             'Milestone' => Milestone::class,
             'User' => User::class,
+            'TimeEntry' => TimeEntry::class,
+            'TaskAssignment' => TaskAssignment::class,
+            'Comment' => Comment::class,
+            'Attachment' => Attachment::class,
+            'TaskDependency' => TaskDependency::class,
             'SpatieRole' => SpatieRole::class,
             'SpatiePermission' => SpatiePermission::class,
         ]);

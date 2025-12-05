@@ -5,6 +5,8 @@ namespace App\Services\Implementations;
 use App\Repositories\Contracts\CommentRepositoryInterface;
 use App\Services\Contracts\CommentServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Comment;
 
 class CommentService implements CommentServiceInterface
 {
@@ -47,13 +49,61 @@ class CommentService implements CommentServiceInterface
     {
         $row = $this->repository->createComment($data);
         $this->clearCaches($row->id ?? null, $row->entity_type ?? null, $row->entity_id ?? null, $row->user_id ?? null);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'comment_id' => $row->id,
+                'entity_type' => $row->entity_type,
+                'entity_id' => $row->entity_id,
+                'user_id' => $row->user_id,
+                'content' => $row->content,
+            ];
+
+            $activity = activity('comments')
+                ->performedOn($row instanceof Comment ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+        }
+
         return $row;
     }
 
     public function updateComment($id, array $data)
     {
+        $before = $this->repository->getCommentById($id);
         $row = $this->repository->updateComment($id, $data);
         $this->clearCaches($id, $row->entity_type ?? null, $row->entity_id ?? null, $row->user_id ?? null);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'comment_id' => $row->id,
+                'entity_type' => $row->entity_type,
+                'entity_id' => $row->entity_id,
+                'user_id' => $row->user_id,
+                'content_before' => $before->content ?? null,
+                'content_after' => $row->content,
+            ];
+
+            $activity = activity('comments')
+                ->performedOn($row instanceof Comment ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+        }
+
         return $row;
     }
 
@@ -62,6 +112,29 @@ class CommentService implements CommentServiceInterface
         $row = $this->repository->getCommentById($id);
         $result = $this->repository->deleteComment($id);
         $this->clearCaches($id, $row->entity_type ?? null, $row->entity_id ?? null, $row->user_id ?? null);
+
+        if ($result && $row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'comment_id' => $row->id,
+                'entity_type' => $row->entity_type,
+                'entity_id' => $row->entity_id,
+                'user_id' => $row->user_id,
+                'content' => $row->content,
+            ];
+
+            $activity = activity('comments')
+                ->performedOn($row instanceof Comment ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 
@@ -69,6 +142,24 @@ class CommentService implements CommentServiceInterface
     {
         $result = $this->repository->deleteCommentsByEntity($entityType, $entityId);
         $this->clearCaches(null, $entityType, $entityId, null);
+
+        if ($result) {
+            $actor = Auth::user();
+
+            $activity = activity('comments')
+                ->withProperties([
+                    'entity_type' => $entityType,
+                    'entity_id' => $entityId,
+                    'action' => 'delete_by_entity',
+                ]);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('bulk_deleted');
+        }
+
         return $result;
     }
 
@@ -87,4 +178,3 @@ class CommentService implements CommentServiceInterface
         if ($entityType && $entityId) Cache::forget(self::CACHE_COUNT_PREFIX.$entityType.'.'.$entityId);
     }
 }
-

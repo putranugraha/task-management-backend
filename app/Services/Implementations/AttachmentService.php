@@ -5,6 +5,8 @@ namespace App\Services\Implementations;
 use App\Repositories\Contracts\AttachmentRepositoryInterface;
 use App\Services\Contracts\AttachmentServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Attachment;
 
 class AttachmentService implements AttachmentServiceInterface
 {
@@ -47,13 +49,71 @@ class AttachmentService implements AttachmentServiceInterface
     {
         $row = $this->repository->createAttachment($data);
         $this->clearCaches($row->id ?? null, $row->entity_type ?? null, $row->entity_id ?? null, $row->uploaded_by ?? null);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'attachment_id' => $row->id,
+                'entity_type' => $row->entity_type,
+                'entity_id' => $row->entity_id,
+                'uploaded_by' => $row->uploaded_by,
+                'filename' => $row->filename,
+                'mime' => $row->mime,
+                'size' => $row->size,
+                'status' => $row->status,
+            ];
+
+            $activity = activity('attachments')
+                ->performedOn($row instanceof Attachment ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+        }
+
         return $row;
     }
 
     public function updateAttachment($id, array $data)
     {
+        $before = $this->repository->getAttachmentById($id);
         $row = $this->repository->updateAttachment($id, $data);
         $this->clearCaches($id, $row->entity_type ?? null, $row->entity_id ?? null, $row->uploaded_by ?? null);
+
+        if ($row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'attachment_id' => $row->id,
+                'entity_type' => $row->entity_type,
+                'entity_id' => $row->entity_id,
+                'uploaded_by' => $row->uploaded_by,
+                'filename' => $row->filename,
+                'mime' => $row->mime,
+                'size' => $row->size,
+                'status_before' => $before->status ?? null,
+                'status_after' => $row->status,
+                'verified_by_before' => $before->verified_by ?? null,
+                'verified_by_after' => $row->verified_by,
+                'verified_at_before' => $before->verified_at ?? null,
+                'verified_at_after' => $row->verified_at,
+            ];
+
+            $activity = activity('attachments')
+                ->performedOn($row instanceof Attachment ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+        }
+
         return $row;
     }
 
@@ -62,6 +122,32 @@ class AttachmentService implements AttachmentServiceInterface
         $row = $this->repository->getAttachmentById($id);
         $result = $this->repository->deleteAttachment($id);
         $this->clearCaches($id, $row->entity_type ?? null, $row->entity_id ?? null, $row->uploaded_by ?? null);
+
+        if ($result && $row) {
+            $actor = Auth::user();
+
+            $properties = [
+                'attachment_id' => $row->id,
+                'entity_type' => $row->entity_type,
+                'entity_id' => $row->entity_id,
+                'uploaded_by' => $row->uploaded_by,
+                'filename' => $row->filename,
+                'mime' => $row->mime,
+                'size' => $row->size,
+                'status' => $row->status,
+            ];
+
+            $activity = activity('attachments')
+                ->performedOn($row instanceof Attachment ? $row : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 
@@ -69,6 +155,24 @@ class AttachmentService implements AttachmentServiceInterface
     {
         $result = $this->repository->deleteAttachmentsByEntity($entityType, $entityId);
         $this->clearCaches(null, $entityType, $entityId, null);
+
+        if ($result) {
+            $actor = Auth::user();
+
+            $activity = activity('attachments')
+                ->withProperties([
+                    'entity_type' => $entityType,
+                    'entity_id' => $entityId,
+                    'action' => 'delete_by_entity',
+                ]);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('bulk_deleted');
+        }
+
         return $result;
     }
 
@@ -87,4 +191,3 @@ class AttachmentService implements AttachmentServiceInterface
         if ($entityType && $entityId) Cache::forget(self::CACHE_TOTAL_PREFIX.$entityType.'.'.$entityId);
     }
 }
-

@@ -6,6 +6,7 @@ use App\Repositories\Contracts\MilestoneRepositoryInterface;
 use App\Services\Contracts\MilestoneServiceInterface;
 use App\Services\Contracts\ProjectBaselineServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class MilestoneService implements MilestoneServiceInterface
@@ -70,13 +71,67 @@ class MilestoneService implements MilestoneServiceInterface
             }
         }
 
+        if ($ms) {
+            $actor = Auth::user();
+
+            $properties = [
+                'milestone_id' => $ms->id,
+                'project_id' => $ms->project_id,
+                'name' => $ms->name,
+                'due_planned' => $ms->due_planned,
+                'due_actual' => $ms->due_actual,
+                'status' => $ms->status,
+            ];
+
+            $activity = activity('milestones')
+                ->performedOn($ms)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('created');
+        }
+
         return $ms;
     }
 
     public function updateMilestone($id, array $data)
     {
+        $before = $this->repository->getMilestoneById($id);
+
         $ms = $this->repository->updateMilestone($id, $data);
         $this->clearCaches($ms->project_id ?? null, $ms->status ?? null, $id);
+
+        if ($ms) {
+            $actor = Auth::user();
+
+            $properties = [
+                'milestone_id' => $ms->id,
+                'project_id_before' => $before->project_id ?? null,
+                'project_id_after' => $ms->project_id,
+                'name_before' => $before->name ?? null,
+                'name_after' => $ms->name,
+                'due_planned_before' => $before->due_planned ?? null,
+                'due_planned_after' => $ms->due_planned,
+                'due_actual_before' => $before->due_actual ?? null,
+                'due_actual_after' => $ms->due_actual,
+                'status_before' => $before->status ?? null,
+                'status_after' => $ms->status,
+            ];
+
+            $activity = activity('milestones')
+                ->performedOn($ms)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('updated');
+        }
+
         return $ms;
     }
 
@@ -85,21 +140,91 @@ class MilestoneService implements MilestoneServiceInterface
         $ms = $this->getMilestoneById($id);
         $result = $this->repository->deleteMilestone($id);
         $this->clearCaches($ms->project_id ?? null, $ms->status ?? null, $id);
+
+        if ($result && $ms) {
+            $actor = Auth::user();
+
+            $properties = [
+                'milestone_id' => $ms->id,
+                'project_id' => $ms->project_id,
+                'name' => $ms->name,
+                'due_planned' => $ms->due_planned,
+                'due_actual' => $ms->due_actual,
+                'status' => $ms->status,
+            ];
+
+            $activity = activity('milestones')
+                ->performedOn($ms)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deleted');
+        }
+
         return $result;
     }
 
     public function updateMilestoneStatus($id, $status)
     {
         if (!in_array($status, self::ALLOWED_STATUSES)) return null;
+        $before = $this->repository->getMilestoneById($id);
         $ms = $this->repository->updateMilestoneStatus($id, $status);
         $this->clearCaches($ms->project_id ?? null, $status, $id);
+
+        if ($ms) {
+            $actor = Auth::user();
+
+            $properties = [
+                'milestone_id' => $ms->id,
+                'project_id' => $ms->project_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $ms->status,
+            ];
+
+            $activity = activity('milestones')
+                ->performedOn($ms)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('status_changed');
+        }
+
         return $ms;
     }
 
     public function completeMilestone($id)
     {
+        $before = $this->repository->getMilestoneById($id);
         $ms = $this->repository->completeMilestone($id);
         $this->clearCaches($ms->project_id ?? null, $ms->status ?? null, $id);
+
+        if ($ms) {
+            $actor = Auth::user();
+
+            $properties = [
+                'milestone_id' => $ms->id,
+                'project_id' => $ms->project_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $ms->status,
+            ];
+
+            $activity = activity('milestones')
+                ->performedOn($ms)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('completed');
+        }
+
         return $ms;
     }
 
