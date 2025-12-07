@@ -21,6 +21,7 @@ use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\KpiSnapshotController;
 use App\Http\Controllers\EvmController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ActivityLogController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -60,6 +61,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Logout current token
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    // Activity logs (for authenticated users, typically viewed by Admin via FE)
+    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 });
 
 // Users API (Resource) protected by Sanctum + Permission
