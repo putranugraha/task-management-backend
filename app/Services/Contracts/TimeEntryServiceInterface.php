@@ -15,5 +15,13 @@ interface TimeEntryServiceInterface
     public function deleteTimeEntry($id);
     public function getTotalHoursByTask($taskId);
     public function getTotalHoursByUser($userId);
-}
 
+    /**
+     * Ambil time entry dengan pagination dan filter sederhana.
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return mixed
+     */
+    public function paginateTimeEntries(array $filters = [], int $perPage = 20);
+}

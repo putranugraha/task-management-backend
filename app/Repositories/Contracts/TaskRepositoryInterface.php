@@ -48,4 +48,15 @@ interface TaskRepositoryInterface
 
     /** Ambil semua task berdasarkan ID milestone. */
     public function getTasksByMilestone($milestoneId);
+
+    /**
+     * Ambil task dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - project_id
+     * - milestone_id
+     * - status
+     * - priority
+     */
+    public function paginateTasks(array $filters = [], int $perPage = 20);
 }

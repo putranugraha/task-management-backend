@@ -102,6 +102,31 @@ class TimeEntryRepository implements TimeEntryRepositoryInterface
         return (float) $this->model->where('user_id', $userId)->sum('hours');
     }
 
+    public function paginateTimeEntries(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model
+            ->orderBy('date', 'desc')
+            ->orderBy('id', 'desc');
+
+        if (isset($filters['task_id'])) {
+            $query->where('task_id', $filters['task_id']);
+        }
+
+        if (isset($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+
+        if (isset($filters['start_date'])) {
+            $query->whereDate('date', '>=', $filters['start_date']);
+        }
+
+        if (isset($filters['end_date'])) {
+            $query->whereDate('date', '<=', $filters['end_date']);
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {
@@ -112,4 +137,3 @@ class TimeEntryRepository implements TimeEntryRepositoryInterface
         }
     }
 }
-

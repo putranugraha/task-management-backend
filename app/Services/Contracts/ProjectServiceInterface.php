@@ -93,4 +93,13 @@ interface ProjectServiceInterface
      * @return mixed
      */
     public function updateProjectStatus($id, $status);
+
+    /**
+     * Ambil proyek dengan pagination dan filter sederhana.
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return mixed
+     */
+    public function paginateProjects(array $filters = [], int $perPage = 20);
 }

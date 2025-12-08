@@ -71,6 +71,13 @@ class ProjectService implements ProjectServiceInterface
         return $this->repository->getProjectsByDateRange($startDate, $endDate);
     }
 
+    public function paginateProjects(array $filters = [], int $perPage = 20)
+    {
+        // Untuk saat ini pagination tidak dicache agar sederhana
+        // dan menghindari kompleksitas key per kombinasi filter + halaman.
+        return $this->repository->paginateProjects($filters, $perPage);
+    }
+
     public function createProject(array $data)
     {
         $project = $this->repository->createProject($data);

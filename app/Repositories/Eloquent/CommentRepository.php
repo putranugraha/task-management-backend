@@ -105,6 +105,22 @@ class CommentRepository implements CommentRepositoryInterface
             ->count();
     }
 
+    public function paginateComments(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model->latest('id');
+
+        if (isset($filters['entity_type']) && isset($filters['entity_id'])) {
+            $query->where('entity_type', $filters['entity_type'])
+                ->where('entity_id', $filters['entity_id']);
+        }
+
+        if (isset($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {
@@ -115,4 +131,3 @@ class CommentRepository implements CommentRepositoryInterface
         }
     }
 }
-

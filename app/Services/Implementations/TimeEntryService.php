@@ -57,6 +57,12 @@ class TimeEntryService implements TimeEntryServiceInterface
         return Cache::remember($key, self::CACHE_DURATION, fn () => $this->repository->getTimeEntriesByDateRange($startDate, $endDate));
     }
 
+    public function paginateTimeEntries(array $filters = [], int $perPage = 20)
+    {
+        // Pagination tidak dicache agar sederhana dan menghindari kompleksitas key.
+        return $this->repository->paginateTimeEntries($filters, $perPage);
+    }
+
     public function createTimeEntry(array $data)
     {
         $data = $this->appendProgressToNote($data);

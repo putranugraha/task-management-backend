@@ -36,5 +36,15 @@ interface TimeEntryRepositoryInterface
 
     /** Hitung total jam kerja dari seorang user. */
     public function getTotalHoursByUser($userId);
-}
 
+    /**
+     * Ambil time entry dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - task_id
+     * - user_id
+     * - start_date
+     * - end_date
+     */
+    public function paginateTimeEntries(array $filters = [], int $perPage = 20);
+}

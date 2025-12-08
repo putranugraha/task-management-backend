@@ -36,24 +36,36 @@ class CommentController extends Controller
             }
         }
 
+        $filters = [];
+
         if ($entityType && $entityId) {
-            $items = $this->service->getCommentsByEntity($entityType, $entityId);
-        } elseif ($userId) {
-            $items = $this->service->getCommentsByUser($userId);
-        } else {
-            $items = $this->service->getAllComments();
+            $filters['entity_type'] = $entityType;
+            $filters['entity_id'] = $entityId;
         }
+
+        if ($userId) {
+            $filters['user_id'] = $userId;
+        }
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $items = $this->service->paginateComments($filters, $perPage);
 
         if ($include) {
             $map = ['entity' => 'entity', 'user' => 'user'];
             $rels = collect(explode(',', $include))
-                ->map(fn($s) => trim($s))
+                ->map(fn ($s) => trim($s))
                 ->filter()
-                ->map(fn($key) => $map[$key] ?? null)
-                ->filter()->values()->all();
-            if (!empty($rels) && method_exists($items, 'load')) {
-                // For morphTo, load('entity') is fine
-                $items->load($rels);
+                ->map(fn ($key) => $map[$key] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+
+            if (!empty($rels)) {
+                $items->getCollection()->load($rels);
             }
         }
 

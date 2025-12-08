@@ -54,6 +54,12 @@ class MilestoneService implements MilestoneServiceInterface
         return $this->repository->getMilestonesByDateRange($startDate, $endDate);
     }
 
+    public function paginateMilestones(array $filters = [], int $perPage = 20)
+    {
+        // Pagination tidak dicache untuk menjaga kesederhanaan key cache.
+        return $this->repository->paginateMilestones($filters, $perPage);
+    }
+
     public function createMilestone(array $data)
     {
         $ms = $this->repository->createMilestone($data);

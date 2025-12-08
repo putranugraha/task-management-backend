@@ -116,6 +116,25 @@ class ProjectRepository implements ProjectRepositoryInterface
         return $project->fresh(['divisionOwner']);
     }
 
+    public function paginateProjects(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model->with(['divisionOwner']);
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['division_owner_id'])) {
+            $query->where('division_owner_id', $filters['division_owner_id']);
+        }
+
+        if (isset($filters['client_name'])) {
+            $query->where('client_name', $filters['client_name']);
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {
@@ -126,4 +145,3 @@ class ProjectRepository implements ProjectRepositoryInterface
         }
     }
 }
-

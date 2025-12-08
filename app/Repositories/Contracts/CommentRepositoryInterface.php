@@ -30,5 +30,14 @@ interface CommentRepositoryInterface
 
     /** Hitung jumlah komentar pada entity tertentu. */
     public function countCommentsByEntity($entityType, $entityId);
-}
 
+    /**
+     * Ambil komentar dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - entity_type
+     * - entity_id
+     * - user_id
+     */
+    public function paginateComments(array $filters = [], int $perPage = 20);
+}

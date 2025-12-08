@@ -93,5 +93,14 @@ interface ProjectRepositoryInterface
      * @return mixed
      */
     public function updateProjectStatus($id, $status);
-}
 
+    /**
+     * Ambil proyek dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - status
+     * - division_owner_id
+     * - client_name (exact)
+     */
+    public function paginateProjects(array $filters = [], int $perPage = 20);
+}

@@ -24,5 +24,13 @@ interface MilestoneServiceInterface
     public function updateMilestoneStatus($id, $status);
     /** Complete milestone (auto due_actual = today). */
     public function completeMilestone($id);
-}
 
+    /**
+     * Ambil milestone dengan pagination dan filter sederhana.
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return mixed
+     */
+    public function paginateMilestones(array $filters = [], int $perPage = 20);
+}

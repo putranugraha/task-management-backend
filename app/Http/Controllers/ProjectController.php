@@ -27,23 +27,38 @@ class ProjectController extends Controller
         $name = $request->query('name');
         $client = $request->query('client_name');
 
+        // 1) Cari berdasarkan nama (tetap non-paginated, hasil maksimal 1)
         if ($name) {
             $project = $this->service->getProjectByName($name);
             if (!$project) {
                 return response()->json(['message' => 'Project tidak ditemukan'], 404);
             }
             return ProjectResource::collection(collect([$project]));
-        } elseif ($client) {
-            $projects = $this->service->getProjectByClient($client);
-        } elseif ($status) {
-            $projects = $this->service->getProjectsByStatus($status);
-        } elseif ($divisionId) {
-            $projects = $this->service->getProjectsByDivision($divisionId);
-        } elseif ($start && $end) {
-            $projects = $this->service->getProjectsByDateRange($start, $end);
-        } else {
-            $projects = $this->service->getAllProjects();
         }
+
+        // 2) Filter berdasarkan rentang tanggal planned (tetap non-paginated)
+        if ($start && $end) {
+            $projects = $this->service->getProjectsByDateRange($start, $end);
+            return ProjectResource::collection($projects);
+        }
+
+        // 3) Path baru: pagination dengan filter sederhana
+        $filters = [
+            'status' => $status,
+            // division_id di query = division_owner_id di database
+            'division_owner_id' => $divisionId,
+            'client_name' => $client,
+        ];
+
+        // Buang filter kosong/null
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $projects = $this->service->paginateProjects($filters, $perPage);
 
         return ProjectResource::collection($projects);
     }

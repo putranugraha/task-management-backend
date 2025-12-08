@@ -19,4 +19,5 @@ interface TaskServiceInterface
     public function updateTaskStatus($id, $status);
     public function updateTaskProgress($id, $percent);
     public function completeTask($id);
+    public function paginateTasks(array $filters = [], int $perPage = 20);
 }

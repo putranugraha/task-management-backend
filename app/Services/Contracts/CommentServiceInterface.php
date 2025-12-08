@@ -13,5 +13,13 @@ interface CommentServiceInterface
     public function deleteComment($id);
     public function deleteCommentsByEntity($entityType, $entityId);
     public function countCommentsByEntity($entityType, $entityId);
-}
 
+    /**
+     * Ambil komentar dengan pagination dan filter sederhana.
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return mixed
+     */
+    public function paginateComments(array $filters = [], int $perPage = 20);
+}

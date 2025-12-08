@@ -85,5 +85,13 @@ interface MilestoneRepositoryInterface
      * @return mixed
      */
     public function completeMilestone($id);
-}
 
+    /**
+     * Ambil milestone dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - project_id
+     * - status
+     */
+    public function paginateMilestones(array $filters = [], int $perPage = 20);
+}

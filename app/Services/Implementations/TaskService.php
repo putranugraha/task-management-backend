@@ -90,6 +90,13 @@ class TaskService implements TaskServiceInterface
         return $this->repository->getTasksByDependsOnTask($dependsOnTaskId);
     }
 
+    public function paginateTasks(array $filters = [], int $perPage = 20)
+    {
+        // Untuk saat ini pagination tidak dicache supaya sederhana dan
+        // menghindari kompleksitas key per kombinasi filter/page.
+        return $this->repository->paginateTasks($filters, $perPage);
+    }
+
     public function createTask(array $data)
     {
         $assignments = $data['assignments'] ?? null;

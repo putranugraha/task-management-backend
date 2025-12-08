@@ -29,28 +29,61 @@ class TimeEntryController extends Controller
         $end = $request->query('end_date');
         $include = $request->query('include'); // task,user
 
-        if (($request->routeIs('tasks.*') && $taskId) || ($taskId && !$userId)) {
-            $items = $this->service->getTimeEntriesByTask($taskId);
-        } elseif (($request->routeIs('users.*') && $userId) || ($userId && !$taskId)) {
-            $items = $this->service->getTimeEntriesByUser($userId);
-        } elseif ($taskId && $userId) {
-            $items = $this->service->getTimeEntriesByTaskAndUser($taskId, $userId);
-        } elseif ($start && $end) {
+        // Khusus untuk laporan rentang tanggal tanpa filter lain, gunakan path non-paginated
+        if ($start && $end && !$taskId && !$userId) {
             $items = $this->service->getTimeEntriesByDateRange($start, $end);
-        } else {
-            $items = $this->service->getAllTimeEntries();
+
+            if ($include) {
+                $map = ['task' => 'task', 'user' => 'user'];
+                $rels = collect(explode(',', $include))
+                    ->map(fn ($s) => trim($s))
+                    ->filter()
+                    ->map(fn ($key) => $map[$key] ?? null)
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if (!empty($rels) && method_exists($items, 'load')) {
+                    $items->load($rels);
+                }
+            }
+
+            return TimeEntryResource::collection($items);
         }
 
+        // Path default: pagination dengan filter sederhana (task_id, user_id, optional range)
+        $filters = [
+            'task_id' => $taskId,
+            'user_id' => $userId,
+        ];
+
+        if ($start && $end) {
+            $filters['start_date'] = $start;
+            $filters['end_date'] = $end;
+        }
+
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $items = $this->service->paginateTimeEntries($filters, $perPage);
+
         if ($include) {
-            $map = [ 'task' => 'task', 'user' => 'user' ];
+            $map = ['task' => 'task', 'user' => 'user'];
             $rels = collect(explode(',', $include))
-                ->map(fn($s) => trim($s))
+                ->map(fn ($s) => trim($s))
                 ->filter()
-                ->map(fn($key) => $map[$key] ?? null)
+                ->map(fn ($key) => $map[$key] ?? null)
                 ->filter()
-                ->values()->all();
-            if (!empty($rels) && method_exists($items, 'load')) {
-                $items->load($rels);
+                ->values()
+                ->all();
+
+            $collection = $items->getCollection();
+            if (!empty($rels)) {
+                $collection->load($rels);
             }
         }
 

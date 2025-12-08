@@ -169,6 +169,12 @@ class CommentService implements CommentServiceInterface
         return Cache::remember($key, self::CACHE_DURATION, fn () => $this->repository->countCommentsByEntity($entityType, $entityId));
     }
 
+    public function paginateComments(array $filters = [], int $perPage = 20)
+    {
+        // Pagination tidak dicache untuk menghindari kompleksitas key per kombinasi filter + halaman.
+        return $this->repository->paginateComments($filters, $perPage);
+    }
+
     protected function clearCaches($id = null, $entityType = null, $entityId = null, $userId = null): void
     {
         Cache::forget(self::CACHE_ALL);

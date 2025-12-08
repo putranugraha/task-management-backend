@@ -21,37 +21,68 @@ class TaskController extends Controller
 
     public function index(Request $request)
     {
-        // Optional filters
-        $milestoneId = $request->query('milestone_id');
-        $projectId = $request->query('project_id');
-        $status = $request->query('status');
-        $priority = $request->query('priority');
+        // Special filters that tidak cocok untuk pagination biasa
         $startPlanned = $request->query('start_planned');
         $endPlanned = $request->query('end_planned');
         $startActual = $request->query('start_actual');
         $endActual = $request->query('end_actual');
         $dependsOnTaskId = $request->query('depends_on_task_id');
-        $include = $request->query('include'); // e.g., "dependencies,dependents,project"
 
-        if ($milestoneId) {
-            $tasks = $this->service->getTasksByMilestone($milestoneId);
-        } elseif ($projectId) {
-            $tasks = $this->service->getTasksByProject($projectId);
-        } elseif ($status) {
-            $tasks = $this->service->getTasksByStatus($status);
-        } elseif ($priority) {
-            $tasks = $this->service->getTasksByPriority($priority);
-        } elseif ($dependsOnTaskId) {
-            $tasks = $this->service->getTasksByDependsOnTask($dependsOnTaskId);
-        } elseif ($startPlanned && $endPlanned) {
-            $tasks = $this->service->getTasksByPlannedDateRange($startPlanned, $endPlanned);
-        } elseif ($startActual && $endActual) {
-            $tasks = $this->service->getTasksByActualDateRange($startActual, $endActual);
-        } else {
-            $tasks = $this->service->getAllTasks();
+        $include = $request->query('include'); // e.g., "dependencies,dependents,assignments"
+
+        // Jika pakai filter tanggal atau depends_on_task_id, gunakan path lama (non-paginated)
+        if ($dependsOnTaskId || ($startPlanned && $endPlanned) || ($startActual && $endActual)) {
+            if ($dependsOnTaskId) {
+                $tasks = $this->service->getTasksByDependsOnTask($dependsOnTaskId);
+            } elseif ($startPlanned && $endPlanned) {
+                $tasks = $this->service->getTasksByPlannedDateRange($startPlanned, $endPlanned);
+            } else {
+                $tasks = $this->service->getTasksByActualDateRange($startActual, $endActual);
+            }
+
+            if ($include && method_exists($tasks, 'load')) {
+                $map = [
+                    'project' => 'project',
+                    'milestone' => 'milestone',
+                    'dependencies' => 'dependencies.dependsOn',
+                    'dependents' => 'dependents.task',
+                    'assignments' => 'assignments.user',
+                ];
+                $rels = collect(explode(',', $include))
+                    ->map(fn ($s) => trim($s))
+                    ->filter()
+                    ->map(fn ($key) => $map[$key] ?? null)
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if (!empty($rels)) {
+                    $tasks->load($rels);
+                }
+            }
+
+            return TaskResource::collection($tasks);
         }
 
-        // Eager-load optional includes for clarity in responses
+        // Pagination path dengan filter sederhana
+        $filters = [
+            'milestone_id' => $request->query('milestone_id'),
+            'project_id' => $request->query('project_id'),
+            'status' => $request->query('status'),
+            'priority' => $request->query('priority'),
+        ];
+
+        // Hanya kirim filter yang terisi ke service
+        $filters = array_filter($filters, fn($value) => $value !== null && $value !== '');
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $tasks = $this->service->paginateTasks($filters, $perPage);
+
+        // Eager-load optional includes untuk relasi berat
         if ($include) {
             $map = [
                 'project' => 'project',
@@ -61,14 +92,15 @@ class TaskController extends Controller
                 'assignments' => 'assignments.user',
             ];
             $rels = collect(explode(',', $include))
-                ->map(fn($s) => trim($s))
+                ->map(fn ($s) => trim($s))
                 ->filter()
-                ->map(fn($key) => $map[$key] ?? null)
+                ->map(fn ($key) => $map[$key] ?? null)
                 ->filter()
                 ->values()
                 ->all();
-            if (!empty($rels) && method_exists($tasks, 'load')) {
-                $tasks->load($rels);
+
+            if (!empty($rels)) {
+                $tasks->getCollection()->load($rels);
             }
         }
 

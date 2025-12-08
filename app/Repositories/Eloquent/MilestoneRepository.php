@@ -112,6 +112,21 @@ class MilestoneRepository implements MilestoneRepositoryInterface
         return $milestone->fresh('project');
     }
 
+    public function paginateMilestones(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model->with('project');
+
+        if (isset($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {
@@ -122,4 +137,3 @@ class MilestoneRepository implements MilestoneRepositoryInterface
         }
     }
 }
-

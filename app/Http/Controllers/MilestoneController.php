@@ -25,15 +25,26 @@ class MilestoneController extends Controller
         $start = $request->query('start');
         $end = $request->query('end');
 
-        if ($projectId) {
-            $milestones = $this->service->getMilestonesByProject($projectId);
-        } elseif ($status) {
-            $milestones = $this->service->getMilestonesByStatus($status);
-        } elseif ($start && $end) {
+        // 1) Laporan rentang tanggal (tanpa pagination) untuk kasus khusus
+        if ($start && $end && !$projectId && !$status) {
             $milestones = $this->service->getMilestonesByDateRange($start, $end);
-        } else {
-            $milestones = $this->service->getAllMilestones();
+            return MilestoneResource::collection($milestones);
         }
+
+        // 2) Path default: pagination dengan filter sederhana
+        $filters = [
+            'project_id' => $projectId,
+            'status' => $status,
+        ];
+
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $milestones = $this->service->paginateMilestones($filters, $perPage);
 
         return MilestoneResource::collection($milestones);
     }

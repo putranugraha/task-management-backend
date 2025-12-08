@@ -155,6 +155,29 @@ class TaskRepository implements TaskRepositoryInterface
             ->get();
     }
 
+    public function paginateTasks(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model->with(['project', 'milestone']);
+
+        if (isset($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['milestone_id'])) {
+            $query->where('milestone_id', $filters['milestone_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['priority'])) {
+            $query->where('priority', $filters['priority']);
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {
