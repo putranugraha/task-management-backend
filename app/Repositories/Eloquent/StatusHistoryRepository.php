@@ -103,6 +103,23 @@ class StatusHistoryRepository implements StatusHistoryRepositoryInterface
             ->get();
     }
 
+    public function paginateHistories(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model->latest('id');
+
+        if (isset($filters['actor_id'])) {
+            $query->where('changed_by', $filters['actor_id']);
+        }
+
+        if (isset($filters['entity_type']) && strtolower($filters['entity_type']) === 'task') {
+            if (isset($filters['entity_id'])) {
+                $query->where('task_id', $filters['entity_id']);
+            }
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {

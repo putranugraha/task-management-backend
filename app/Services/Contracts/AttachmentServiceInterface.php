@@ -13,5 +13,13 @@ interface AttachmentServiceInterface
     public function deleteAttachment($id);
     public function deleteAttachmentsByEntity($entityType, $entityId);
     public function getTotalSizeByEntity($entityType, $entityId);
-}
 
+    /**
+     * Ambil attachment dengan pagination dan filter sederhana.
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return mixed
+     */
+    public function paginateAttachments(array $filters = [], int $perPage = 20);
+}

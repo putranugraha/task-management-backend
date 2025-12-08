@@ -77,6 +77,12 @@ class StatusHistoryService implements StatusHistoryServiceInterface
         return Cache::remember($key, self::CACHE_DURATION, fn () => $this->repository->getHistoriesByDateRange($startDate, $endDate));
     }
 
+    public function paginateHistories(array $filters = [], int $perPage = 20)
+    {
+        // Pagination tidak dicache untuk menghindari kompleksitas key kombinasi filter + halaman.
+        return $this->repository->paginateHistories($filters, $perPage);
+    }
+
     protected function clearCaches($id = null, $actorId = null, $entityType = null, $entityId = null): void
     {
         Cache::forget(self::CACHE_ALL);
@@ -86,4 +92,3 @@ class StatusHistoryService implements StatusHistoryServiceInterface
         if ($entityType && $entityId) Cache::forget(self::CACHE_ENTITY_PREFIX.$entityType.'.'.$entityId);
     }
 }
-

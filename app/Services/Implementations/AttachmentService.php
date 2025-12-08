@@ -182,6 +182,12 @@ class AttachmentService implements AttachmentServiceInterface
         return Cache::remember($key, self::CACHE_DURATION, fn () => $this->repository->getTotalSizeByEntity($entityType, $entityId));
     }
 
+    public function paginateAttachments(array $filters = [], int $perPage = 20)
+    {
+        // Pagination tidak dicache untuk menghindari kompleksitas key kombinasi filter + halaman.
+        return $this->repository->paginateAttachments($filters, $perPage);
+    }
+
     protected function clearCaches($id = null, $entityType = null, $entityId = null, $userId = null): void
     {
         Cache::forget(self::CACHE_ALL);

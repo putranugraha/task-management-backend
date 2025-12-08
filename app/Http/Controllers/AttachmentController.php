@@ -37,23 +37,36 @@ class AttachmentController extends Controller
             }
         }
 
+        $filters = [];
+
         if ($entityType && $entityId) {
-            $items = $this->service->getAttachmentsByEntity($entityType, $entityId);
-        } elseif ($userId) {
-            $items = $this->service->getAttachmentsByUser($userId);
-        } else {
-            $items = $this->service->getAllAttachments();
+            $filters['entity_type'] = $entityType;
+            $filters['entity_id'] = $entityId;
         }
+
+        if ($userId) {
+            $filters['uploaded_by'] = $userId;
+        }
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $items = $this->service->paginateAttachments($filters, $perPage);
 
         if ($include) {
             $map = ['entity' => 'entity', 'uploader' => 'uploader'];
             $rels = collect(explode(',', $include))
-                ->map(fn($s) => trim($s))
+                ->map(fn ($s) => trim($s))
                 ->filter()
-                ->map(fn($key) => $map[$key] ?? null)
-                ->filter()->values()->all();
-            if (!empty($rels) && method_exists($items, 'load')) {
-                $items->load($rels);
+                ->map(fn ($key) => $map[$key] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+
+            if (!empty($rels)) {
+                $items->getCollection()->load($rels);
             }
         }
 

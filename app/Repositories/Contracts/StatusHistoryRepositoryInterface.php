@@ -30,5 +30,14 @@ interface StatusHistoryRepositoryInterface
 
     /** Ambil histori dalam rentang tanggal tertentu (berdasarkan created_at). */
     public function getHistoriesByDateRange($startDate, $endDate);
-}
 
+    /**
+     * Ambil histori status dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - actor_id (changed_by)
+     * - entity_type (saat ini hanya Task)
+     * - entity_id (task_id ketika entity_type=Task)
+     */
+    public function paginateHistories(array $filters = [], int $perPage = 20);
+}

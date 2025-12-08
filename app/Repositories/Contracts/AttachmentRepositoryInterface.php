@@ -30,5 +30,14 @@ interface AttachmentRepositoryInterface
 
     /** Hitung total ukuran file (size) untuk entity tertentu. */
     public function getTotalSizeByEntity($entityType, $entityId);
-}
 
+    /**
+     * Ambil attachment dengan filter sederhana dan pagination.
+     *
+     * $filters dapat berisi:
+     * - entity_type
+     * - entity_id
+     * - uploaded_by
+     */
+    public function paginateAttachments(array $filters = [], int $perPage = 20);
+}

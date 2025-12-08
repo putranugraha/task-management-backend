@@ -26,19 +26,53 @@ class StatusHistoryController extends Controller
         $end = $request->query('end_date');
         $include = $request->query('include'); // e.g., "task,changer"
 
-        if ($request->routeIs('*status-histories') && $routeTask) {
-            $items = $this->service->getHistoriesByEntity('Task', $routeTask);
-        } elseif ($actorId) {
-            $items = $this->service->getHistoriesByActor($actorId);
-        } elseif ($entityType && $entityId) {
-            $items = $this->service->getHistoriesByEntity($entityType, $entityId);
-        } elseif ($entityType) {
-            $items = $this->service->getHistoriesByEntityType($entityType);
-        } elseif ($start && $end) {
+        // Laporan range tanggal murni (tanpa entity/actor) tetap non-paginated
+        if ($start && $end && !$actorId && !$entityType && !$entityId && !$routeTask) {
             $items = $this->service->getHistoriesByDateRange($start, $end);
-        } else {
-            $items = $this->service->getAllHistories();
+
+            if ($include) {
+                $map = [
+                    'task' => 'task',
+                    'changer' => 'changer',
+                ];
+                $rels = collect(explode(',', $include))
+                    ->map(fn ($s) => trim($s))
+                    ->filter()
+                    ->map(fn ($key) => $map[$key] ?? null)
+                    ->filter()
+                    ->values()
+                    ->all();
+                if (!empty($rels) && method_exists($items, 'load')) {
+                    $items->load($rels);
+                }
+            }
+
+            return StatusHistoryResource::collection($items);
         }
+
+        // Path default: pagination dengan filter sederhana
+        $filters = [];
+
+        if ($request->routeIs('*status-histories') && $routeTask) {
+            $filters['entity_type'] = 'Task';
+            $filters['entity_id'] = $routeTask;
+        } elseif ($entityType && $entityId) {
+            $filters['entity_type'] = $entityType;
+            $filters['entity_id'] = $entityId;
+        } elseif ($entityType) {
+            $filters['entity_type'] = $entityType;
+        }
+
+        if ($actorId) {
+            $filters['actor_id'] = $actorId;
+        }
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $items = $this->service->paginateHistories($filters, $perPage);
 
         if ($include) {
             $map = [
@@ -46,14 +80,14 @@ class StatusHistoryController extends Controller
                 'changer' => 'changer',
             ];
             $rels = collect(explode(',', $include))
-                ->map(fn($s) => trim($s))
+                ->map(fn ($s) => trim($s))
                 ->filter()
-                ->map(fn($key) => $map[$key] ?? null)
+                ->map(fn ($key) => $map[$key] ?? null)
                 ->filter()
                 ->values()
                 ->all();
-            if (!empty($rels) && method_exists($items, 'load')) {
-                $items->load($rels);
+            if (!empty($rels)) {
+                $items->getCollection()->load($rels);
             }
         }
 

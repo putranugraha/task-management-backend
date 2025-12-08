@@ -13,5 +13,13 @@ interface StatusHistoryServiceInterface
     public function deleteHistory($id);
     public function deleteHistoriesByEntity($entityType, $entityId);
     public function getHistoriesByDateRange($startDate, $endDate);
-}
 
+    /**
+     * Ambil histori status dengan pagination dan filter sederhana.
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return mixed
+     */
+    public function paginateHistories(array $filters = [], int $perPage = 20);
+}

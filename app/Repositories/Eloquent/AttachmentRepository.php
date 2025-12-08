@@ -107,6 +107,24 @@ class AttachmentRepository implements AttachmentRepositoryInterface
             ->sum('size');
     }
 
+    public function paginateAttachments(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model
+            ->orderByDesc('uploaded_at')
+            ->orderByDesc('id');
+
+        if (isset($filters['entity_type']) && isset($filters['entity_id'])) {
+            $query->where('entity_type', $filters['entity_type'])
+                ->where('entity_id', $filters['entity_id']);
+        }
+
+        if (isset($filters['uploaded_by'])) {
+            $query->where('uploaded_by', $filters['uploaded_by']);
+        }
+
+        return $query->paginate($perPage);
+    }
+
     protected function find($id)
     {
         try {
@@ -117,4 +135,3 @@ class AttachmentRepository implements AttachmentRepositoryInterface
         }
     }
 }
-
