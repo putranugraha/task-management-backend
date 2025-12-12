@@ -120,6 +120,7 @@ class ProjectRepository implements ProjectRepositoryInterface
     {
         $query = $this->model->with(['divisionOwner']);
 
+        // Simple filters
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
         }
@@ -132,7 +133,69 @@ class ProjectRepository implements ProjectRepositoryInterface
             $query->where('client_name', $filters['client_name']);
         }
 
-        return $query->paginate($perPage);
+        // Free-text search across common columns (case-insensitive)
+        if (!empty($filters['search'])) {
+            $search = mb_strtolower($filters['search']);
+            $query->where(function ($q) use ($search) {
+                $like = "%{$search}%";
+                $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(client_name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(status) LIKE ?', [$like]);
+            });
+        }
+
+        // Show newest projects first so recent creations
+        // (e.g. id 36) appear on the first page.
+        return $query
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Hitung jumlah proyek total dan per status berdasarkan filter sederhana.
+     *
+     * @param array $filters
+     * @return array{total:int,by_status:array<string,int>}
+     */
+    public function getProjectStatusCounts(array $filters = []): array
+    {
+        $baseQuery = $this->model->newQuery();
+
+        // Simple filters (sama seperti paginateProjects, tanpa eager load)
+        if (isset($filters['status'])) {
+            $baseQuery->where('status', $filters['status']);
+        }
+
+        if (isset($filters['division_owner_id'])) {
+            $baseQuery->where('division_owner_id', $filters['division_owner_id']);
+        }
+
+        if (isset($filters['client_name'])) {
+            $baseQuery->where('client_name', $filters['client_name']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = mb_strtolower($filters['search']);
+            $baseQuery->where(function ($q) use ($search) {
+                $like = "%{$search}%";
+                $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(client_name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(status) LIKE ?', [$like]);
+            });
+        }
+
+        $total = (clone $baseQuery)->count();
+
+        $byStatus = (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status')
+            ->toArray();
+
+        return [
+            'total' => (int) $total,
+            'by_status' => array_map('intval', $byStatus),
+        ];
     }
 
     protected function find($id)

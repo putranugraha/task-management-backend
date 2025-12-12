@@ -94,4 +94,16 @@ interface MilestoneRepositoryInterface
      * - status
      */
     public function paginateMilestones(array $filters = [], int $perPage = 20);
+
+    /**
+     * Hitung jumlah milestone total dan per status berdasarkan filter sederhana.
+     *
+     * Mengembalikan array dengan kunci:
+     * - total: int
+     * - by_status: array<string,int> (status => jumlah)
+     *
+     * @param array $filters
+     * @return array{total:int,by_status:array<string,int>}
+     */
+    public function getMilestoneStatusCounts(array $filters = []): array;
 }

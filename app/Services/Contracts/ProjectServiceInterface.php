@@ -102,4 +102,12 @@ interface ProjectServiceInterface
      * @return mixed
      */
     public function paginateProjects(array $filters = [], int $perPage = 20);
+
+    /**
+     * Ambil statistik proyek (total, active, completed) berdasarkan filter sederhana.
+     *
+     * @param array $filters
+     * @return array{total:int,active:int,completed:int}
+     */
+    public function getProjectStats(array $filters = []): array;
 }

@@ -33,4 +33,12 @@ interface MilestoneServiceInterface
      * @return mixed
      */
     public function paginateMilestones(array $filters = [], int $perPage = 20);
+
+    /**
+     * Ambil statistik milestone (total, completed, overdue) berdasarkan filter sederhana.
+     *
+     * @param array $filters
+     * @return array{total:int,completed:int,overdue:int}
+     */
+    public function getMilestoneStats(array $filters = []): array;
 }

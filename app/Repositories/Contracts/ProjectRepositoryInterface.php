@@ -103,4 +103,16 @@ interface ProjectRepositoryInterface
      * - client_name (exact)
      */
     public function paginateProjects(array $filters = [], int $perPage = 20);
+
+    /**
+     * Hitung statistik proyek berdasarkan filter sederhana.
+     *
+     * Mengembalikan array dengan kunci:
+     * - total: int
+     * - by_status: array<string,int> (status => jumlah)
+     *
+     * @param array $filters
+     * @return array{total:int,by_status:array<string,int>}
+     */
+    public function getProjectStatusCounts(array $filters = []): array;
 }

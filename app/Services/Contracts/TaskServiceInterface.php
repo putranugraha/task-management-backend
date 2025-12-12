@@ -20,4 +20,12 @@ interface TaskServiceInterface
     public function updateTaskProgress($id, $percent);
     public function completeTask($id);
     public function paginateTasks(array $filters = [], int $perPage = 20);
+
+    /**
+     * Ambil statistik task (total, completed, in_progress) berdasarkan filter sederhana.
+     *
+     * @param array $filters
+     * @return array{total:int,completed:int,in_progress:int}
+     */
+    public function getTaskStats(array $filters = []): array;
 }

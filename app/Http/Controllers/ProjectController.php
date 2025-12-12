@@ -26,6 +26,7 @@ class ProjectController extends Controller
         $end = $request->query('end');
         $name = $request->query('name');
         $client = $request->query('client_name');
+        $search = $request->query('search');
 
         // 1) Cari berdasarkan nama (tetap non-paginated, hasil maksimal 1)
         if ($name) {
@@ -48,6 +49,7 @@ class ProjectController extends Controller
             // division_id di query = division_owner_id di database
             'division_owner_id' => $divisionId,
             'client_name' => $client,
+            'search' => $search,
         ];
 
         // Buang filter kosong/null
@@ -61,6 +63,33 @@ class ProjectController extends Controller
         $projects = $this->service->paginateProjects($filters, $perPage);
 
         return ProjectResource::collection($projects);
+    }
+
+    /**
+     * Statistik ringkas proyek untuk dashboard cards.
+     *
+     * Menghormati filter sederhana yang sama dengan index (status, division_id, client_name, search)
+     * namun tidak terikat pada pagination (selalu menghitung dari seluruh hasil filter).
+     */
+    public function stats(Request $request)
+    {
+        $status = $request->query('status');
+        $divisionId = $request->query('division_id');
+        $client = $request->query('client_name');
+        $search = $request->query('search');
+
+        $filters = [
+            'status' => $status,
+            'division_owner_id' => $divisionId,
+            'client_name' => $client,
+            'search' => $search,
+        ];
+
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
+
+        $stats = $this->service->getProjectStats($filters);
+
+        return response()->json($stats);
     }
 
     public function byName(Request $request)

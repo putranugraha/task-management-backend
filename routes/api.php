@@ -22,6 +22,7 @@ use App\Http\Controllers\KpiSnapshotController;
 use App\Http\Controllers\EvmController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\NotificationController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -64,6 +65,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Activity logs (for authenticated users, typically viewed by Admin via FE)
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+
+    // User notifications
+    Route::get('/me/notifications', [NotificationController::class, 'index']);
+    Route::post('/me/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
 });
 
 // Users API (Resource) protected by Sanctum + Permission
@@ -101,6 +106,9 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
 // Projects API as apiResource
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    // Stats route harus didefinisikan sebelum apiResource
+    // agar tidak tertimpa oleh binding projects/{project}
+    Route::get('projects/stats', [ProjectController::class, 'stats']);
     Route::apiResource('projects', ProjectController::class)->only(['index','show']);
     Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['index','show']);
     Route::get('projects/{project}/baselines', [ProjectBaselineController::class, 'index']);
@@ -137,6 +145,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
 // Milestones API as apiResource
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    // Stats route sebelum apiResource agar tidak tertimpa oleh binding {milestone}
+    Route::get('milestones/stats', [MilestoneController::class, 'stats']);
     Route::apiResource('milestones', MilestoneController::class)->only(['index','show']);
     // Nested listing by project
     Route::get('projects/{project}/milestones', [MilestoneController::class, 'indexByProject']);
@@ -154,6 +164,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
 // Tasks API as apiResource
 // Read-only for those with 'melihat project'
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    // Stats route sebelum apiResource agar tidak tertimpa oleh binding {task}
+    Route::get('tasks/stats', [TaskController::class, 'stats']);
     Route::apiResource('tasks', TaskController::class)->only(['index','show']);
     // Nested listing by project
     Route::get('projects/{project}/tasks', [TaskController::class, 'indexByProject']);
@@ -275,10 +287,6 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola lampiran'])->
     Route::patch('attachments/{attachment}/reject', [AttachmentController::class, 'reject']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
-
-
-
 
 
 

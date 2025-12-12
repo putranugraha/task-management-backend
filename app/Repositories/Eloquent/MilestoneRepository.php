@@ -124,7 +124,62 @@ class MilestoneRepository implements MilestoneRepositoryInterface
             $query->where('status', $filters['status']);
         }
 
+        // Free-text search across milestone + project fields
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($qp) use ($search) {
+                        $qp->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         return $query->paginate($perPage);
+    }
+
+    /**
+     * Hitung jumlah milestone total dan per status berdasarkan filter sederhana.
+     *
+     * @param array $filters
+     * @return array{total:int,by_status:array<string,int>}
+     */
+    public function getMilestoneStatusCounts(array $filters = []): array
+    {
+        $baseQuery = $this->model->newQuery();
+
+        if (isset($filters['project_id'])) {
+            $baseQuery->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $baseQuery->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($qp) use ($search) {
+                        $qp->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $total = (clone $baseQuery)->count();
+
+        $byStatus = (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status')
+            ->toArray();
+
+        return [
+            'total' => (int) $total,
+            'by_status' => array_map('intval', $byStatus),
+        ];
     }
 
     protected function find($id)

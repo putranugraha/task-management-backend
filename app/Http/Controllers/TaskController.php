@@ -29,6 +29,7 @@ class TaskController extends Controller
         $dependsOnTaskId = $request->query('depends_on_task_id');
 
         $include = $request->query('include'); // e.g., "dependencies,dependents,assignments"
+        $search = $request->query('search');
 
         // Jika pakai filter tanggal atau depends_on_task_id, gunakan path lama (non-paginated)
         if ($dependsOnTaskId || ($startPlanned && $endPlanned) || ($startActual && $endActual)) {
@@ -70,6 +71,7 @@ class TaskController extends Controller
             'project_id' => $request->query('project_id'),
             'status' => $request->query('status'),
             'priority' => $request->query('priority'),
+            'search' => $search,
         ];
 
         // Hanya kirim filter yang terisi ke service
@@ -105,6 +107,29 @@ class TaskController extends Controller
         }
 
         return TaskResource::collection($tasks);
+    }
+
+    /**
+     * Statistik ringkas tasks untuk dashboard cards.
+     *
+     * Menghormati filter sederhana (project_id, milestone_id, status, priority, search)
+     * namun tidak terikat pagination.
+     */
+    public function stats(Request $request)
+    {
+        $filters = [
+            'project_id' => $request->query('project_id'),
+            'milestone_id' => $request->query('milestone_id'),
+            'status' => $request->query('status'),
+            'priority' => $request->query('priority'),
+            'search' => $request->query('search'),
+        ];
+
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
+
+        $stats = $this->service->getTaskStats($filters);
+
+        return response()->json($stats);
     }
 
     public function store(TaskStoreRequest $request)

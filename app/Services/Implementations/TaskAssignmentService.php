@@ -7,6 +7,9 @@ use App\Services\Contracts\TaskAssignmentServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
 use App\Models\TaskAssignment;
+use App\Models\Task;
+use App\Models\User;
+use App\Notifications\TaskActivityNotification;
 
 class TaskAssignmentService implements TaskAssignmentServiceInterface
 {
@@ -74,6 +77,23 @@ class TaskAssignmentService implements TaskAssignmentServiceInterface
             }
 
             $activity->log('created');
+
+            $task = Task::find($assignment->task_id);
+            $assignee = User::find($assignment->user_id);
+
+            if ($task && $assignee) {
+                $payload = [
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'entity_type' => 'Task',
+                    'entity_id' => $task->id,
+                    'actor_id' => $actor?->id,
+                    'actor_name' => $actor?->name,
+                    'message' => 'Anda ditugaskan pada task '.$task->title.' sebagai '.$assignment->role_on_task,
+                ];
+
+                $assignee->notify(new TaskActivityNotification('task_assigned', $payload));
+            }
         }
 
         return $assignment;

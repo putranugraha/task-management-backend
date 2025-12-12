@@ -97,6 +97,32 @@ class TaskService implements TaskServiceInterface
         return $this->repository->paginateTasks($filters, $perPage);
     }
 
+    /**
+     * Hitung statistik task (total, completed, in_progress) berdasarkan filter sederhana.
+     *
+     * Completed didefinisikan sebagai status "Done".
+     * In progress didefinisikan sebagai status "In Progress".
+     *
+     * @param array $filters
+     * @return array{total:int,completed:int,in_progress:int}
+     */
+    public function getTaskStats(array $filters = []): array
+    {
+        $counts = $this->repository->getTaskStatusCounts($filters);
+
+        $total = $counts['total'] ?? 0;
+        $byStatus = $counts['by_status'] ?? [];
+
+        $completed = $byStatus['Done'] ?? 0;
+        $inProgress = $byStatus['In Progress'] ?? 0;
+
+        return [
+            'total' => (int) $total,
+            'completed' => (int) $completed,
+            'in_progress' => (int) $inProgress,
+        ];
+    }
+
     public function createTask(array $data)
     {
         $assignments = $data['assignments'] ?? null;

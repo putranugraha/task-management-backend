@@ -24,6 +24,7 @@ class MilestoneController extends Controller
         $status = $request->query('status');
         $start = $request->query('start');
         $end = $request->query('end');
+        $search = $request->query('search');
 
         // 1) Laporan rentang tanggal (tanpa pagination) untuk kasus khusus
         if ($start && $end && !$projectId && !$status) {
@@ -35,6 +36,7 @@ class MilestoneController extends Controller
         $filters = [
             'project_id' => $projectId,
             'status' => $status,
+            'search' => $search,
         ];
 
         $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
@@ -47,6 +49,30 @@ class MilestoneController extends Controller
         $milestones = $this->service->paginateMilestones($filters, $perPage);
 
         return MilestoneResource::collection($milestones);
+    }
+
+    /**
+     * Statistik ringkas milestones untuk dashboard cards.
+     *
+     * Menghormati filter sederhana (project_id, status, search) namun tidak terikat pagination.
+     */
+    public function stats(Request $request)
+    {
+        $projectId = $request->query('project_id');
+        $status = $request->query('status');
+        $search = $request->query('search');
+
+        $filters = [
+            'project_id' => $projectId,
+            'status' => $status,
+            'search' => $search,
+        ];
+
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
+
+        $stats = $this->service->getMilestoneStats($filters);
+
+        return response()->json($stats);
     }
 
     public function store(MilestoneStoreRequest $request)

@@ -6,6 +6,10 @@ use Illuminate\Http\Request;
 use App\Http\Requests\CommentStoreRequest;
 use App\Http\Requests\CommentUpdateRequest;
 use App\Http\Resources\CommentResource;
+use App\Models\Task;
+use App\Models\TaskAssignment;
+use App\Models\User;
+use App\Notifications\TaskActivityNotification;
 use App\Services\Contracts\CommentServiceInterface;
 
 class CommentController extends Controller
@@ -76,6 +80,44 @@ class CommentController extends Controller
     {
         $row = $this->service->createComment($request->validated());
         if (!$row) return response()->json(['message' => 'Gagal membuat komentar'], 400);
+
+        $actor = $request->user();
+
+        if ($row->entity_type === 'Task') {
+            $task = Task::find($row->entity_id);
+
+            if ($task) {
+                $payload = [
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'entity_type' => 'Task',
+                    'entity_id' => $task->id,
+                    'comment_id' => $row->id,
+                    'actor_id' => $actor?->id,
+                    'actor_name' => $actor?->name,
+                    'message' => 'Komentar baru ditambahkan pada task '.$task->title,
+                ];
+
+                $assignedUsers = TaskAssignment::where('task_id', $task->id)
+                    ->with('user')
+                    ->get()
+                    ->pluck('user')
+                    ->filter();
+
+                $admins = User::role('Admin')->get();
+
+                $targets = $assignedUsers->merge($admins)->unique('id');
+
+                foreach ($targets as $target) {
+                    if ($actor && $target->id === $actor->id) {
+                        continue;
+                    }
+
+                    $target->notify(new TaskActivityNotification('comment_added', $payload));
+                }
+            }
+        }
+
         return new CommentResource($row);
     }
 

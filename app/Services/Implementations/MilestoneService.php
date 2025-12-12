@@ -60,6 +60,32 @@ class MilestoneService implements MilestoneServiceInterface
         return $this->repository->paginateMilestones($filters, $perPage);
     }
 
+    /**
+     * Hitung statistik milestone (total, completed, overdue) berdasarkan filter sederhana.
+     *
+     * Completed didefinisikan sebagai status "Completed".
+     * Overdue didefinisikan sebagai status "Overdue".
+     *
+     * @param array $filters
+     * @return array{total:int,completed:int,overdue:int}
+     */
+    public function getMilestoneStats(array $filters = []): array
+    {
+        $counts = $this->repository->getMilestoneStatusCounts($filters);
+
+        $total = $counts['total'] ?? 0;
+        $byStatus = $counts['by_status'] ?? [];
+
+        $completed = $byStatus['Completed'] ?? 0;
+        $overdue = $byStatus['Overdue'] ?? 0;
+
+        return [
+            'total' => (int) $total,
+            'completed' => (int) $completed,
+            'overdue' => (int) $overdue,
+        ];
+    }
+
     public function createMilestone(array $data)
     {
         $ms = $this->repository->createMilestone($data);

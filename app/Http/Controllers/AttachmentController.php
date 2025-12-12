@@ -9,6 +9,9 @@ use App\Http\Requests\AttachmentUpdateRequest;
 use App\Http\Requests\AttachmentUploadRequest;
 use App\Http\Resources\AttachmentResource;
 use App\Models\Task;
+use App\Models\TaskAssignment;
+use App\Models\User;
+use App\Notifications\TaskActivityNotification;
 use App\Services\Contracts\AttachmentServiceInterface;
 
 class AttachmentController extends Controller
@@ -106,6 +109,37 @@ class AttachmentController extends Controller
         $row = $this->service->createAttachment($data);
         if (!$row) return response()->json(['message' => 'Gagal mengunggah attachment'], 400);
 
+        $actor = $request->user();
+        $payload = [
+            'task_id' => $task->id,
+            'task_title' => $task->title,
+            'entity_type' => 'Task',
+            'entity_id' => $task->id,
+            'attachment_id' => $row->id,
+            'actor_id' => $actor?->id,
+            'actor_name' => $actor?->name,
+            'message' => 'Attachment baru di-upload pada task '.$task->title,
+        ];
+
+        $managerAssignments = TaskAssignment::where('task_id', $task->id)
+            ->where('role_on_task', 'Manager')
+            ->with('user')
+            ->get()
+            ->pluck('user')
+            ->filter();
+
+        $admins = User::role('Admin')->get();
+
+        $targets = $managerAssignments->merge($admins)->unique('id');
+
+        foreach ($targets as $target) {
+            if ($actor && $target->id === $actor->id) {
+                continue;
+            }
+
+            $target->notify(new TaskActivityNotification('attachment_uploaded', $payload));
+        }
+
         return new AttachmentResource($row);
     }
 
@@ -147,6 +181,19 @@ class AttachmentController extends Controller
             return response()->json(['message' => 'User tidak terautentik'], 401);
         }
 
+        if (!$user->hasAnyRole(['Admin', 'Manager', 'Super Admin'])) {
+            return response()->json(['message' => 'Anda tidak memiliki hak untuk meng-approve attachment'], 403);
+        }
+
+        $current = $this->service->getAttachmentById($id);
+        if (!$current) {
+            return response()->json(['message' => 'Attachment tidak ditemukan'], 404);
+        }
+
+        if (in_array($current->status, ['Approved', 'Rejected'], true)) {
+            return response()->json(['message' => 'Attachment sudah memiliki status final'], 400);
+        }
+
         $row = $this->service->updateAttachment($id, [
             'status' => 'Approved',
             'verified_by' => $user->id,
@@ -155,6 +202,59 @@ class AttachmentController extends Controller
 
         if (!$row) {
             return response()->json(['message' => 'Attachment tidak ditemukan atau gagal di-approve'], 404);
+        }
+
+        $actor = $user;
+        $row->loadMissing('uploader', 'entity');
+
+        $task = null;
+        if ($row->entity_type === 'Task') {
+            $task = $row->entity instanceof Task ? $row->entity : Task::find($row->entity_id);
+        }
+
+        $payload = [
+            'task_id' => $task?->id,
+            'task_title' => $task?->title,
+            'entity_type' => $row->entity_type,
+            'entity_id' => $row->entity_id,
+            'attachment_id' => $row->id,
+            'actor_id' => $actor->id,
+            'actor_name' => $actor->name,
+            'message' => $task
+                ? 'Attachment pada task '.$task->title.' telah di-approve.'
+                : 'Attachment telah di-approve.',
+        ];
+
+        $targets = collect();
+
+        if ($row->uploader) {
+            $targets->push($row->uploader);
+        } elseif ($row->uploaded_by) {
+            $uploader = User::find($row->uploaded_by);
+            if ($uploader) {
+                $targets->push($uploader);
+            }
+        }
+
+        if ($task) {
+            $assignedUsers = TaskAssignment::where('task_id', $task->id)
+                ->with('user')
+                ->get()
+                ->pluck('user')
+                ->filter();
+
+            $targets = $targets->merge($assignedUsers);
+        }
+
+        $admins = User::role('Admin')->get();
+        $targets = $targets->merge($admins)->filter()->unique('id');
+
+        foreach ($targets as $target) {
+            if ($target->id === $actor->id) {
+                continue;
+            }
+
+            $target->notify(new TaskActivityNotification('attachment_approved', $payload));
         }
 
         return new AttachmentResource($row->loadMissing('verifier'));
@@ -171,6 +271,19 @@ class AttachmentController extends Controller
             return response()->json(['message' => 'User tidak terautentik'], 401);
         }
 
+        if (!$user->hasAnyRole(['Admin', 'Manager', 'Super Admin'])) {
+            return response()->json(['message' => 'Anda tidak memiliki hak untuk meng-reject attachment'], 403);
+        }
+
+        $current = $this->service->getAttachmentById($id);
+        if (!$current) {
+            return response()->json(['message' => 'Attachment tidak ditemukan'], 404);
+        }
+
+        if (in_array($current->status, ['Approved', 'Rejected'], true)) {
+            return response()->json(['message' => 'Attachment sudah memiliki status final'], 400);
+        }
+
         $row = $this->service->updateAttachment($id, [
             'status' => 'Rejected',
             'verified_by' => $user->id,
@@ -179,6 +292,59 @@ class AttachmentController extends Controller
 
         if (!$row) {
             return response()->json(['message' => 'Attachment tidak ditemukan atau gagal di-reject'], 404);
+        }
+
+        $actor = $user;
+        $row->loadMissing('uploader', 'entity');
+
+        $task = null;
+        if ($row->entity_type === 'Task') {
+            $task = $row->entity instanceof Task ? $row->entity : Task::find($row->entity_id);
+        }
+
+        $payload = [
+            'task_id' => $task?->id,
+            'task_title' => $task?->title,
+            'entity_type' => $row->entity_type,
+            'entity_id' => $row->entity_id,
+            'attachment_id' => $row->id,
+            'actor_id' => $actor->id,
+            'actor_name' => $actor->name,
+            'message' => $task
+                ? 'Attachment pada task '.$task->title.' telah di-reject.'
+                : 'Attachment telah di-reject.',
+        ];
+
+        $targets = collect();
+
+        if ($row->uploader) {
+            $targets->push($row->uploader);
+        } elseif ($row->uploaded_by) {
+            $uploader = User::find($row->uploaded_by);
+            if ($uploader) {
+                $targets->push($uploader);
+            }
+        }
+
+        if ($task) {
+            $assignedUsers = TaskAssignment::where('task_id', $task->id)
+                ->with('user')
+                ->get()
+                ->pluck('user')
+                ->filter();
+
+            $targets = $targets->merge($assignedUsers);
+        }
+
+        $admins = User::role('Admin')->get();
+        $targets = $targets->merge($admins)->filter()->unique('id');
+
+        foreach ($targets as $target) {
+            if ($target->id === $actor->id) {
+                continue;
+            }
+
+            $target->notify(new TaskActivityNotification('attachment_rejected', $payload));
         }
 
         return new AttachmentResource($row->loadMissing('verifier'));

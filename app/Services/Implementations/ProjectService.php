@@ -78,6 +78,39 @@ class ProjectService implements ProjectServiceInterface
         return $this->repository->paginateProjects($filters, $perPage);
     }
 
+    /**
+     * Hitung statistik proyek (total, active, completed) berdasarkan filter sederhana.
+     *
+     * Active didefinisikan sebagai semua status yang bukan Completed atau Cancelled.
+     *
+     * @param array $filters
+     * @return array{total:int,active:int,completed:int}
+     */
+    public function getProjectStats(array $filters = []): array
+    {
+        $counts = $this->repository->getProjectStatusCounts($filters);
+
+        $total = $counts['total'] ?? 0;
+        $byStatus = $counts['by_status'] ?? [];
+
+        $completed = $byStatus['Completed'] ?? 0;
+
+        // Active = semua status yang bukan Completed atau Cancelled
+        $inactiveStatuses = ['Completed', 'Cancelled'];
+        $active = 0;
+        foreach ($byStatus as $status => $count) {
+            if (!in_array($status, $inactiveStatuses, true)) {
+                $active += $count;
+            }
+        }
+
+        return [
+            'total' => (int) $total,
+            'active' => (int) $active,
+            'completed' => (int) $completed,
+        ];
+    }
+
     public function createProject(array $data)
     {
         $project = $this->repository->createProject($data);

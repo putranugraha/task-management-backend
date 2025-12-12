@@ -175,7 +175,78 @@ class TaskRepository implements TaskRepositoryInterface
             $query->where('priority', $filters['priority']);
         }
 
+        // Free-text search across task + related project/milestone
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('priority', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($qp) use ($search) {
+                        $qp->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('milestone', function ($qm) use ($search) {
+                        $qm->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         return $query->paginate($perPage);
+    }
+
+    /**
+     * Hitung jumlah task total dan per status berdasarkan filter sederhana.
+     *
+     * @param array $filters
+     * @return array{total:int,by_status:array<string,int>}
+     */
+    public function getTaskStatusCounts(array $filters = []): array
+    {
+        $baseQuery = $this->model->newQuery();
+
+        if (isset($filters['project_id'])) {
+            $baseQuery->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['milestone_id'])) {
+            $baseQuery->where('milestone_id', $filters['milestone_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $baseQuery->where('status', $filters['status']);
+        }
+
+        if (isset($filters['priority'])) {
+            $baseQuery->where('priority', $filters['priority']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('priority', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($qp) use ($search) {
+                        $qp->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('milestone', function ($qm) use ($search) {
+                        $qm->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $total = (clone $baseQuery)->count();
+
+        $byStatus = (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status')
+            ->toArray();
+
+        return [
+            'total' => (int) $total,
+            'by_status' => array_map('intval', $byStatus),
+        ];
     }
 
     protected function find($id)

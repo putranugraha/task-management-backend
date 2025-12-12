@@ -59,4 +59,16 @@ interface TaskRepositoryInterface
      * - priority
      */
     public function paginateTasks(array $filters = [], int $perPage = 20);
+
+    /**
+     * Hitung jumlah task total dan per status berdasarkan filter sederhana.
+     *
+     * Mengembalikan array dengan kunci:
+     * - total: int
+     * - by_status: array<string,int> (status => jumlah)
+     *
+     * @param array $filters
+     * @return array{total:int,by_status:array<string,int>}
+     */
+    public function getTaskStatusCounts(array $filters = []): array;
 }
