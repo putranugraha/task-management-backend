@@ -64,14 +64,28 @@ class TaskResource extends JsonResource
             }),
             'assignments' => $this->whenLoaded('assignments', function () {
                 return $this->assignments->map(function ($a) {
+                    $user = $a->user;
+
+                    $primaryRoleName = null;
+                    $roleNames = [];
+
+                    if ($user) {
+                        $roles = $user->roles ?? collect();
+                        $primary = $roles->first();
+                        $primaryRoleName = $primary->name ?? null;
+                        $roleNames = $roles->pluck('name')->values()->all();
+                    }
+
                     return [
                         'id' => $a->id,
                         'role_on_task' => $a->role_on_task,
                         'estimated_effort_hours' => $a->estimated_effort_hours,
                         'assigned_at' => optional($a->assigned_at)->toDateTimeString(),
                         'user' => [
-                            'id' => $a->user->id ?? null,
-                            'name' => $a->user->name ?? null,
+                            'id' => $user->id ?? null,
+                            'name' => $user->name ?? null,
+                            'role' => $primaryRoleName,
+                            'roles' => $roleNames,
                         ],
                     ];
                 });

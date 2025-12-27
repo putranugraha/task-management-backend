@@ -10,7 +10,7 @@ class ActivityLogController extends Controller
     public function index(Request $request)
     {
         $query = Activity::query()
-            ->with(['causer', 'subject'])
+            ->with('causer')
             ->latest('created_at');
 
         if ($logName = $request->query('log_name')) {
@@ -65,4 +65,3 @@ class ActivityLogController extends Controller
         ]);
     }
 }
-

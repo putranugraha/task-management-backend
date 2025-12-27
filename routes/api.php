@@ -264,7 +264,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
 });
 
 // Manage comments
-Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola komentar'])->group(function () {
     Route::apiResource('comments', CommentController::class)->only(['store','update','destroy']);
     Route::delete('comments/by-entity', [CommentController::class, 'destroyByEntity']);
 });
@@ -287,7 +287,6 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola lampiran'])->
     Route::patch('attachments/{attachment}/reject', [AttachmentController::class, 'reject']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
 
 
 

@@ -118,6 +118,8 @@ class CommentController extends Controller
             }
         }
 
+        // Pastikan relasi user ter-load agar FE bisa menampilkan nama user
+        $row->load('user');
         return new CommentResource($row);
     }
 

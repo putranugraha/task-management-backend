@@ -7,9 +7,11 @@ use App\Services\Contracts\ProjectBaselineServiceInterface;
 use App\Services\Contracts\TaskBaselineServiceInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use Illuminate\Support\Facades\Cache;
+use App\Models\User;
 use App\Models\StatusHistory;
 use App\Models\Task;
 use App\Models\Milestone;
+use App\Notifications\TaskActivityNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -189,6 +191,9 @@ class TaskService implements TaskServiceInterface
         $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
 
         if ($task) {
+            // Notify all assignees for a freshly created task.
+            $this->notifyAssigneesForTask($task, []);
+
             $actor = Auth::user();
 
             $properties = [
@@ -223,6 +228,14 @@ class TaskService implements TaskServiceInterface
         unset($data['dependencies']);
 
         $before = $this->repository->getTaskById($id);
+        $previousUserIds = [];
+        if ($before && method_exists($before, 'relationLoaded') && $before->relationLoaded('assignments')) {
+            foreach ($before->assignments as $a) {
+                if ($a && $a->user_id) {
+                    $previousUserIds[] = (int) $a->user_id;
+                }
+            }
+        }
 
         $task = null;
         DB::transaction(function () use (&$task, $id, $data, $assignments, $dependencies) {
@@ -274,6 +287,9 @@ class TaskService implements TaskServiceInterface
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
 
         if ($task) {
+            // Notify only users who are newly assigned compared to the previous snapshot.
+            $this->notifyAssigneesForTask($task, $previousUserIds);
+
             $actor = Auth::user();
 
             $properties = [
@@ -537,6 +553,54 @@ class TaskService implements TaskServiceInterface
             Cache::forget('milestones.status.'.$milestone->status);
         }
         Cache::forget('milestone.'.$milestone->id);
+    }
+
+    /**
+     * Kirim notifikasi ke user yang baru ditugaskan pada task.
+     *
+     * @param Task $task Task yang memiliki assignments ter-load.
+     * @param array<int,int> $previousUserIds Daftar user_id yang sudah pernah ter-assign sebelumnya.
+     */
+    protected function notifyAssigneesForTask(Task $task, array $previousUserIds = []): void
+    {
+        $actor = Auth::user();
+        $alreadyNotified = [];
+
+        foreach ($task->assignments as $assignment) {
+            $userId = (int) ($assignment->user_id ?? 0);
+            if ($userId <= 0) {
+                continue;
+            }
+            if (in_array($userId, $previousUserIds, true)) {
+                continue;
+            }
+            if (isset($alreadyNotified[$userId])) {
+                continue;
+            }
+            $alreadyNotified[$userId] = true;
+
+            $assignee = $assignment->relationLoaded('user') ? $assignment->user : null;
+            if (!$assignee instanceof User) {
+                $assignee = User::find($userId);
+            }
+            if (!$assignee instanceof User) {
+                continue;
+            }
+
+            $role = $assignment->role_on_task ?: 'Member';
+
+            $payload = [
+                'task_id' => $task->id,
+                'task_title' => $task->title,
+                'entity_type' => 'Task',
+                'entity_id' => $task->id,
+                'actor_id' => $actor?->id,
+                'actor_name' => $actor?->name,
+                'message' => 'Anda ditugaskan pada task '.$task->title.' sebagai '.$role,
+            ];
+
+            $assignee->notify(new TaskActivityNotification('task_assigned', $payload));
+        }
     }
 
     protected function clearCaches($id = null, $status = null, $projectId = null, $priority = null, $milestoneId = null): void
