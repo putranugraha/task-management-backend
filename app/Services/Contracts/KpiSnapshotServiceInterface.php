@@ -14,5 +14,5 @@ interface KpiSnapshotServiceInterface
     public function deleteKpiSnapshot($id);
     public function deleteKpiSnapshotsByProject($projectId);
     public function getAverageCycleTimeByProject($projectId);
+    public function generateForProjectAndDate($projectId, $periodDate, ?string $note = null);
 }
-

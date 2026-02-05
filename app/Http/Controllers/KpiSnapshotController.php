@@ -87,5 +87,19 @@ class KpiSnapshotController extends Controller
             'average_cycle_time_days' => round((float) $avg, 2),
         ]);
     }
-}
 
+    public function generateForProject(Request $request, string $projectId)
+    {
+        $data = $request->validate([
+            'period_date' => ['required', 'date'],
+            'note' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $snap = $this->service->generateForProjectAndDate($projectId, $data['period_date'], $data['note'] ?? null);
+        if (!$snap) {
+            return response()->json(['message' => 'Gagal menghasilkan KPI snapshot'], 400);
+        }
+
+        return new KpiSnapshotResource($snap);
+    }
+}

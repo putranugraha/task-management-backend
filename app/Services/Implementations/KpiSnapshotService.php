@@ -4,6 +4,10 @@ namespace App\Services\Implementations;
 
 use App\Repositories\Contracts\KpiSnapshotRepositoryInterface;
 use App\Services\Contracts\KpiSnapshotServiceInterface;
+use App\Models\KpiSnapshot;
+use App\Models\ReportingPeriod;
+use App\Models\Task;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 class KpiSnapshotService implements KpiSnapshotServiceInterface
@@ -84,6 +88,80 @@ class KpiSnapshotService implements KpiSnapshotServiceInterface
         return Cache::remember(self::CACHE_AVG_PREFIX.$projectId, self::CACHE_DURATION, fn () => $this->repository->getAverageCycleTimeByProject($projectId));
     }
 
+    public function generateForProjectAndDate($projectId, $periodDate, ?string $note = null)
+    {
+        $projectId = (int) $projectId;
+        if (!$projectId || !$periodDate) {
+            return null;
+        }
+
+        $date = Carbon::parse($periodDate)->startOfDay();
+
+        $period = ReportingPeriod::where('project_id', $projectId)
+            ->whereDate('period_date', $date->toDateString())
+            ->first();
+
+        if (!$period) {
+            $period = ReportingPeriod::create([
+                'project_id' => $projectId,
+                'period_date' => $date->toDateString(),
+                'note' => $note,
+            ]);
+        } elseif ($note !== null) {
+            $period->note = $note;
+            $period->save();
+        }
+
+        // Clear reporting period caches so FE can see latest periods without manual refresh
+        Cache::forget('reporting_periods.all');
+        Cache::forget('reporting_periods.project.'.$projectId);
+        Cache::forget('reporting_period.date.'.$projectId.'.'.$date->toDateString());
+
+        $tasks = Task::where('project_id', $projectId)->get();
+        $tasksTotal = $tasks->count();
+        $tasksDone = $tasks->where('status', 'Done')->count();
+
+        $overdueCount = $tasks
+            ->filter(function ($task) use ($date) {
+                if (empty($task->end_planned)) {
+                    return false;
+                }
+
+                $plannedEnd = Carbon::parse($task->end_planned);
+
+                return $plannedEnd->lessThan($date) && $task->status !== 'Done';
+            })
+            ->count();
+
+        $cycleTimes = $tasks
+            ->filter(fn ($task) => $task->start_actual && $task->end_actual)
+            ->map(function ($task) {
+                $start = Carbon::parse($task->start_actual);
+                $end = Carbon::parse($task->end_actual);
+
+                return max(0, $start->diffInDays($end));
+            });
+
+        $avgCycle = $cycleTimes->isNotEmpty() ? round($cycleTimes->avg(), 2) : 0;
+
+        $snap = KpiSnapshot::updateOrCreate(
+            [
+                'project_id' => $projectId,
+                'period_id' => $period->id,
+            ],
+            [
+                'tasks_total' => $tasksTotal,
+                'tasks_done' => $tasksDone,
+                'overdue_count' => $overdueCount,
+                'avg_cycle_time_days' => $avgCycle,
+            ]
+        );
+
+        $this->clearCaches($snap->id ?? null, $projectId, $period->id);
+
+        return $snap->fresh(['project', 'reportingPeriod']);
+    }
+
     protected function clearCaches($id = null, $projectId = null, $periodId = null): void
     {
         Cache::forget(self::CACHE_ALL);
@@ -94,4 +172,3 @@ class KpiSnapshotService implements KpiSnapshotServiceInterface
         if ($projectId !== null) Cache::forget(self::CACHE_AVG_PREFIX.$projectId);
     }
 }
-

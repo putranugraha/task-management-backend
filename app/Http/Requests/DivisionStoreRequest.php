@@ -14,7 +14,8 @@ class DivisionStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => 'required|string|max:50|unique:divisions,code',
+            // Code is auto-generated/uniquified server-side when empty or colliding.
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:150',
             'description' => 'nullable|string',
         ];

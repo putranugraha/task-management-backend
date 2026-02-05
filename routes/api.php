@@ -139,6 +139,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->g
     // KPI Snapshots manage
     Route::apiResource('kpi-snapshots', KpiSnapshotController::class)->only(['store','update','destroy']);
     Route::delete('projects/{project}/kpi-snapshots', [KpiSnapshotController::class, 'destroyByProject']);
+    Route::post('projects/{project}/kpi-snapshots/generate', [KpiSnapshotController::class, 'generateForProject']);
     Route::patch('projects/{project}/status', [ProjectController::class, 'updateStatus']);
 });
 
@@ -287,7 +288,6 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola lampiran'])->
     Route::patch('attachments/{attachment}/reject', [AttachmentController::class, 'reject']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
 
 
 

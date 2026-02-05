@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
+use App\Models\Division;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Task;
@@ -159,6 +160,7 @@ class AppServiceProvider extends ServiceProvider
             'Task' => Task::class,
             'Project' => Project::class,
             'Milestone' => Milestone::class,
+            'Division' => Division::class,
             'User' => User::class,
             'TimeEntry' => TimeEntry::class,
             'TaskAssignment' => TaskAssignment::class,

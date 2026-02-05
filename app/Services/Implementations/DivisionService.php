@@ -46,7 +46,19 @@ class DivisionService implements DivisionServiceInterface
 
     public function createDivision(array $data)
     {
-        $division = $this->repository->createDivision($data);
+        // Auto-generate numeric codes (01, 02, 03, ...) to keep Division codes simple and consistent.
+        // Code is still unique at the DB level; we retry a few times in case of race collisions.
+        $data['code'] = $this->generateNextNumericCode();
+
+        $division = null;
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $division = $this->repository->createDivision($data);
+            if ($division) {
+                break;
+            }
+            $data['code'] = $this->incrementNumericCode($data['code'] ?? null);
+        }
+
         if ($division) {
             $this->clearCaches($division->id, $division->code, $division->name);
 
@@ -157,6 +169,39 @@ class DivisionService implements DivisionServiceInterface
         if ($name) {
             Cache::forget(self::CACHE_NAME_PREFIX.$name);
         }
+    }
+
+    protected function generateNextNumericCode(): string
+    {
+        $max = 0;
+        $codes = Division::query()->get(['code']);
+        foreach ($codes as $row) {
+            $code = (string) ($row->code ?? '');
+            if (!preg_match('/^\d+$/', $code)) {
+                continue;
+            }
+            $val = (int) $code;
+            if ($val > $max) {
+                $max = $val;
+            }
+        }
+        return $this->formatNumericCode($max + 1);
+    }
+
+    protected function incrementNumericCode(?string $current): string
+    {
+        $current = (string) ($current ?? '');
+        $n = preg_match('/^\d+$/', $current) ? (int) $current : 0;
+        return $this->formatNumericCode($n + 1);
+    }
+
+    protected function formatNumericCode(int $n): string
+    {
+        if ($n < 1) {
+            $n = 1;
+        }
+        // Pad to 2 digits minimum: 1 -> 01, 10 -> 10
+        return str_pad((string) $n, 2, '0', STR_PAD_LEFT);
     }
 }
 

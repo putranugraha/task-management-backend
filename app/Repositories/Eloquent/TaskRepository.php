@@ -3,9 +3,12 @@
 namespace App\Repositories\Eloquent;
 
 use App\Models\Task;
+use App\Models\Project;
+use App\Models\Milestone;
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
 
 class TaskRepository implements TaskRepositoryInterface
@@ -91,7 +94,18 @@ class TaskRepository implements TaskRepositoryInterface
         if (!$task) return null;
 
         try {
+            if (($data['status'] ?? null) === 'Done') {
+                if (empty($data['end_actual']) && !$task->end_actual) {
+                    $data['end_actual'] = Carbon::now()->toDateString();
+                }
+                if (!array_key_exists('percent_complete', $data) && (int) ($task->percent_complete ?? 0) < 100) {
+                    $data['percent_complete'] = 100;
+                }
+            }
             $task->update($data);
+            if ($task->status === 'Done') {
+                $this->updateProjectCompletionIfDone($task->project_id);
+            }
             return $task->fresh(['project', 'milestone']);
         } catch (\Exception $e) {
             Log::error("Failed to update task {$id}: {$e->getMessage()}");
@@ -119,7 +133,13 @@ class TaskRepository implements TaskRepositoryInterface
         if (!$task) return null;
 
         $task->status = $status;
+        if ($status === 'Done' && !$task->end_actual) {
+            $task->end_actual = Carbon::now()->toDateString();
+        }
         $task->save();
+        if ($status === 'Done') {
+            $this->updateProjectCompletionIfDone($task->project_id);
+        }
         return $task->fresh(['project', 'milestone']);
     }
 
@@ -141,6 +161,7 @@ class TaskRepository implements TaskRepositoryInterface
         $task->end_actual = Carbon::now()->toDateString();
         $task->percent_complete = 100;
         $task->save();
+        $this->updateProjectCompletionIfDone($task->project_id);
 
         return $task->fresh(['project', 'milestone']);
     }
@@ -257,5 +278,51 @@ class TaskRepository implements TaskRepositoryInterface
             Log::error("Task with ID {$id} not found.");
             return null;
         }
+    }
+
+    protected function updateProjectCompletionIfDone(?int $projectId): void
+    {
+        if (!$projectId) {
+            return;
+        }
+
+        $project = Project::find($projectId);
+        if (!$project) {
+            return;
+        }
+
+        if (in_array($project->status, ['Completed', 'Cancelled'], true)) {
+            return;
+        }
+
+        $taskTotal = Task::where('project_id', $projectId)->count();
+        if ($taskTotal === 0) {
+            return;
+        }
+
+        $taskDone = Task::where('project_id', $projectId)
+            ->where('status', 'Done')
+            ->count();
+
+        if ($taskDone !== $taskTotal) {
+            return;
+        }
+
+        $milestoneTotal = Milestone::where('project_id', $projectId)->count();
+        if ($milestoneTotal > 0) {
+            $milestoneDone = Milestone::where('project_id', $projectId)
+                ->where('status', 'Completed')
+                ->count();
+
+            if ($milestoneDone !== $milestoneTotal) {
+                return;
+            }
+        }
+
+        $project->status = 'Completed';
+        $project->save();
+        Cache::forget('projects.all');
+        Cache::forget('project.'.$projectId);
+        Cache::forget('projects.status.'.$project->status);
     }
 }

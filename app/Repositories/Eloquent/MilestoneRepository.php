@@ -3,9 +3,12 @@
 namespace App\Repositories\Eloquent;
 
 use App\Models\Milestone;
+use App\Models\Project;
+use App\Models\Task;
 use App\Repositories\Contracts\MilestoneRepositoryInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
 
 class MilestoneRepository implements MilestoneRepositoryInterface
@@ -96,7 +99,16 @@ class MilestoneRepository implements MilestoneRepositoryInterface
         if (!$milestone) return null;
 
         $milestone->status = $status;
+
+        // due_actual is system-managed: set when milestone transitions to Completed.
+        // Do not overwrite if it was already set (preserve original completion date).
+        if ($status === 'Completed' && empty($milestone->due_actual)) {
+            $milestone->due_actual = Carbon::now()->toDateString();
+        }
         $milestone->save();
+        if ($status === 'Completed') {
+            $this->updateProjectCompletionIfDone($milestone->project_id);
+        }
         return $milestone->fresh('project');
     }
 
@@ -106,8 +118,11 @@ class MilestoneRepository implements MilestoneRepositoryInterface
         if (!$milestone) return null;
 
         $milestone->status = 'Completed';
-        $milestone->due_actual = Carbon::now()->toDateString();
+        if (empty($milestone->due_actual)) {
+            $milestone->due_actual = Carbon::now()->toDateString();
+        }
         $milestone->save();
+        $this->updateProjectCompletionIfDone($milestone->project_id);
 
         return $milestone->fresh('project');
     }
@@ -190,5 +205,51 @@ class MilestoneRepository implements MilestoneRepositoryInterface
             Log::error("Milestone with ID {$id} not found.");
             return null;
         }
+    }
+
+    protected function updateProjectCompletionIfDone(?int $projectId): void
+    {
+        if (!$projectId) {
+            return;
+        }
+
+        $project = Project::find($projectId);
+        if (!$project) {
+            return;
+        }
+
+        if (in_array($project->status, ['Completed', 'Cancelled'], true)) {
+            return;
+        }
+
+        $taskTotal = Task::where('project_id', $projectId)->count();
+        if ($taskTotal === 0) {
+            return;
+        }
+
+        $taskDone = Task::where('project_id', $projectId)
+            ->where('status', 'Done')
+            ->count();
+
+        if ($taskDone !== $taskTotal) {
+            return;
+        }
+
+        $milestoneTotal = Milestone::where('project_id', $projectId)->count();
+        if ($milestoneTotal > 0) {
+            $milestoneDone = Milestone::where('project_id', $projectId)
+                ->where('status', 'Completed')
+                ->count();
+
+            if ($milestoneDone !== $milestoneTotal) {
+                return;
+            }
+        }
+
+        $project->status = 'Completed';
+        $project->save();
+        Cache::forget('projects.all');
+        Cache::forget('project.'.$projectId);
+        Cache::forget('projects.status.'.$project->status);
     }
 }

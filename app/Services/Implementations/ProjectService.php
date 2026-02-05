@@ -8,6 +8,7 @@ use App\Services\Contracts\ProjectServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Mews\Purifier\Facades\Purifier;
 
 class ProjectService implements ProjectServiceInterface
 {
@@ -113,6 +114,7 @@ class ProjectService implements ProjectServiceInterface
 
     public function createProject(array $data)
     {
+        $data = $this->sanitizeProjectRichText($data);
         $project = $this->repository->createProject($data);
         $this->clearCaches();
 
@@ -152,6 +154,7 @@ class ProjectService implements ProjectServiceInterface
 
     public function updateProject($id, array $data)
     {
+        $data = $this->sanitizeProjectRichText($data);
         $before = $this->repository->getProjectById($id);
 
         $project = $this->repository->updateProject($id, $data);
@@ -262,5 +265,29 @@ class ProjectService implements ProjectServiceInterface
         if ($status !== null) {
             Cache::forget(self::CACHE_STATUS_PREFIX.$status);
         }
+    }
+
+    protected function sanitizeProjectRichText(array $data): array
+    {
+        $allowed = 'p,b,strong,i,em,ul,ol,li,br';
+
+        foreach (['scope', 'objective'] as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+            $value = $data[$key];
+            if ($value === null || $value === '') {
+                $data[$key] = $value;
+                continue;
+            }
+            $data[$key] = Purifier::clean((string) $value, [
+                'HTML.Allowed' => $allowed,
+                'Attr.EnableID' => false,
+                'CSS.AllowedProperties' => [],
+                'AutoFormat.RemoveEmpty' => true,
+            ]);
+        }
+
+        return $data;
     }
 }

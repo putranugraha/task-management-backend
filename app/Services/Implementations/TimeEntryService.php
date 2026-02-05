@@ -7,6 +7,8 @@ use App\Services\Contracts\TimeEntryServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
 use App\Models\TimeEntry;
+use App\Models\Task;
+use Illuminate\Support\Carbon;
 
 class TimeEntryService implements TimeEntryServiceInterface
 {
@@ -68,6 +70,9 @@ class TimeEntryService implements TimeEntryServiceInterface
         $data = $this->appendProgressToNote($data);
         $row = $this->repository->createTimeEntry($data);
         $this->clearCaches($row->id ?? null, $row->task_id ?? null, $row->user_id ?? null);
+        if ($row) {
+            $this->markTaskStartedFromTimeEntry((int) $row->task_id, (string) $row->date);
+        }
 
         if ($row) {
             $actor = Auth::user();
@@ -126,6 +131,9 @@ class TimeEntryService implements TimeEntryServiceInterface
         );
 
         $this->clearCaches($row->id ?? null, $taskId, $userId);
+        if ($row) {
+            $this->markTaskStartedFromTimeEntry((int) $taskId, (string) $date);
+        }
 
         if ($row) {
             $actor = Auth::user();
@@ -276,5 +284,39 @@ class TimeEntryService implements TimeEntryServiceInterface
 
         $data['note'] = $note;
         return $data;
+    }
+
+    protected function markTaskStartedFromTimeEntry(int $taskId, string $entryDate): void
+    {
+        $task = Task::find($taskId);
+        if (!$task) {
+            return;
+        }
+
+        $terminal = ['Done', 'Cancelled', 'On Hold'];
+        $dirty = false;
+
+        if (!in_array($task->status, $terminal, true) && $task->status !== 'In Progress') {
+            $task->status = 'In Progress';
+            $dirty = true;
+        }
+
+        if ($entryDate) {
+            $entry = Carbon::parse($entryDate)->toDateString();
+            if (!$task->start_actual) {
+                $task->start_actual = $entry;
+                $dirty = true;
+            } else {
+                $current = Carbon::parse($task->start_actual)->toDateString();
+                if ($entry < $current) {
+                    $task->start_actual = $entry;
+                    $dirty = true;
+                }
+            }
+        }
+
+        if ($dirty) {
+            $task->save();
+        }
     }
 }
