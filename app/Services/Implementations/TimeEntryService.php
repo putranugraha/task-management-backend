@@ -240,6 +240,18 @@ class TimeEntryService implements TimeEntryServiceInterface
         return Cache::remember(self::CACHE_TOTAL_USER_PREFIX.$userId, self::CACHE_DURATION, fn () => $this->repository->getTotalHoursByUser($userId));
     }
 
+    public function getTotalHoursByProjectAsOf(int $projectId, string $asOfDate)
+    {
+        // Do not cache project aggregates to avoid stale results across tasks/time entries.
+        return $this->repository->getTotalHoursByProjectAsOf($projectId, $asOfDate);
+    }
+
+    public function getTopTasksByHoursAsOf(int $projectId, string $asOfDate, int $limit = 5)
+    {
+        // Do not cache project aggregates to avoid stale results across tasks/time entries.
+        return $this->repository->getTopTasksByHoursAsOf($projectId, $asOfDate, $limit);
+    }
+
     protected function clearCaches($id = null, $taskId = null, $userId = null): void
     {
         Cache::forget(self::CACHE_ALL);

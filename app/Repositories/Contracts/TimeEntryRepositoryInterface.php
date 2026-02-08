@@ -38,6 +38,25 @@ interface TimeEntryRepositoryInterface
     public function getTotalHoursByUser($userId);
 
     /**
+     * Hitung total jam kerja pada sebuah project sampai tanggal tertentu (as-of).
+     *
+     * @param int $projectId
+     * @param string $asOfDate Y-m-d
+     * @return float
+     */
+    public function getTotalHoursByProjectAsOf(int $projectId, string $asOfDate): float;
+
+    /**
+     * Ambil daftar task dengan total jam terbesar pada sebuah project sampai tanggal tertentu (as-of).
+     *
+     * @param int $projectId
+     * @param string $asOfDate Y-m-d
+     * @param int $limit
+     * @return array<int, array{task_id:int,task_title:string|null,total_hours:float}>
+     */
+    public function getTopTasksByHoursAsOf(int $projectId, string $asOfDate, int $limit = 5): array;
+
+    /**
      * Ambil time entry dengan filter sederhana dan pagination.
      *
      * $filters dapat berisi:

@@ -7,8 +7,10 @@ use App\Http\Requests\TimeEntryStoreRequest;
 use App\Http\Requests\TimeEntryUpdateRequest;
 use App\Http\Requests\TaskTimeEntryStoreRequest;
 use App\Http\Resources\TimeEntryResource;
+use App\Models\Project;
 use App\Models\Task;
 use App\Services\Contracts\TimeEntryServiceInterface;
+use Illuminate\Support\Carbon;
 
 class TimeEntryController extends Controller
 {
@@ -186,5 +188,55 @@ class TimeEntryController extends Controller
     {
         $total = $this->service->getTotalHoursByUser($userId);
         return response()->json(['user_id' => (int)$userId, 'total_hours' => (float)$total]);
+    }
+
+    /**
+     * Total actual hours for a project up to an as-of date (inclusive).
+     *
+     * Route: GET /projects/{project}/time-entries/total-hours?date=YYYY-MM-DD
+     */
+    public function totalHoursByProject(Project $project, Request $request)
+    {
+        $date = $request->query('date');
+        try {
+            $asOf = $date ? Carbon::parse($date)->toDateString() : Carbon::today()->toDateString();
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Invalid date. Use YYYY-MM-DD.'], 422);
+        }
+
+        $total = $this->service->getTotalHoursByProjectAsOf((int) $project->id, $asOf);
+
+        return response()->json([
+            'project_id' => (int) $project->id,
+            'as_of' => $asOf,
+            'total_hours' => (float) $total,
+        ]);
+    }
+
+    /**
+     * Top tasks by actual hours for a project up to an as-of date (inclusive).
+     *
+     * Route: GET /projects/{project}/time-entries/top-tasks?date=YYYY-MM-DD&limit=5
+     */
+    public function topTasksByProject(Project $project, Request $request)
+    {
+        $date = $request->query('date');
+        try {
+            $asOf = $date ? Carbon::parse($date)->toDateString() : Carbon::today()->toDateString();
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Invalid date. Use YYYY-MM-DD.'], 422);
+        }
+        $limit = (int) $request->query('limit', 5);
+        if ($limit <= 0) $limit = 5;
+        if ($limit > 50) $limit = 50;
+
+        $items = $this->service->getTopTasksByHoursAsOf((int) $project->id, $asOf, $limit);
+
+        return response()->json([
+            'project_id' => (int) $project->id,
+            'as_of' => $asOf,
+            'limit' => $limit,
+            'items' => $items,
+        ]);
     }
 }

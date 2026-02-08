@@ -15,6 +15,8 @@ interface TimeEntryServiceInterface
     public function deleteTimeEntry($id);
     public function getTotalHoursByTask($taskId);
     public function getTotalHoursByUser($userId);
+    public function getTotalHoursByProjectAsOf(int $projectId, string $asOfDate);
+    public function getTopTasksByHoursAsOf(int $projectId, string $asOfDate, int $limit = 5);
 
     /**
      * Ambil time entry dengan pagination dan filter sederhana.

@@ -237,6 +237,9 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::get('users/{user}/time-entries', [TimeEntryController::class, 'index']);
     Route::get('tasks/{task}/time-entries/total-hours', [TimeEntryController::class, 'totalHoursByTask']);
     Route::get('users/{user}/time-entries/total-hours', [TimeEntryController::class, 'totalHoursByUser']);
+    // Project-level aggregates (as-of date) for schedule/effort analysis
+    Route::get('projects/{project}/time-entries/total-hours', [TimeEntryController::class, 'totalHoursByProject']);
+    Route::get('projects/{project}/time-entries/top-tasks', [TimeEntryController::class, 'topTasksByProject']);
 });
 
 // Manage time entries
@@ -288,7 +291,6 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola lampiran'])->
     Route::patch('attachments/{attachment}/reject', [AttachmentController::class, 'reject']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
 
 
 

@@ -102,6 +102,47 @@ class TimeEntryRepository implements TimeEntryRepositoryInterface
         return (float) $this->model->where('user_id', $userId)->sum('hours');
     }
 
+    public function getTotalHoursByProjectAsOf(int $projectId, string $asOfDate): float
+    {
+        return (float) $this->model
+            ->join('tasks', 'tasks.id', '=', 'time_entries.task_id')
+            ->where('tasks.project_id', $projectId)
+            ->whereDate('time_entries.date', '<=', $asOfDate)
+            ->sum('time_entries.hours');
+    }
+
+    public function getTopTasksByHoursAsOf(int $projectId, string $asOfDate, int $limit = 5): array
+    {
+        $limit = (int) $limit;
+        if ($limit <= 0) {
+            $limit = 5;
+        }
+        if ($limit > 50) {
+            $limit = 50;
+        }
+
+        $rows = $this->model
+            ->join('tasks', 'tasks.id', '=', 'time_entries.task_id')
+            ->where('tasks.project_id', $projectId)
+            ->whereDate('time_entries.date', '<=', $asOfDate)
+            ->selectRaw('time_entries.task_id as task_id, tasks.title as task_title, COALESCE(SUM(time_entries.hours),0) as total_hours')
+            ->groupBy('time_entries.task_id', 'tasks.title')
+            ->orderByRaw('COALESCE(SUM(time_entries.hours),0) DESC')
+            ->limit($limit)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'task_id' => (int) $row->task_id,
+                    'task_title' => $row->task_title,
+                    'total_hours' => (float) $row->total_hours,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return $rows;
+    }
+
     public function paginateTimeEntries(array $filters = [], int $perPage = 20)
     {
         $query = $this->model
