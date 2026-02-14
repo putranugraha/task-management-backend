@@ -24,6 +24,7 @@ class TaskResource extends JsonResource
             'end_actual' => optional($this->end_actual)->format('Y-m-d'),
             'duration_actual' => $this->duration_actual,
             'percent_complete' => $this->percent_complete,
+            'budget_cost' => (string) ($this->budget_cost ?? '0.00'),
             'project' => $this->whenLoaded('project', function () {
                 return [
                     'id' => $this->project->id,

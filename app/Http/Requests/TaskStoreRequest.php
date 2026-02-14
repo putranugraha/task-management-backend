@@ -31,6 +31,7 @@ class TaskStoreRequest extends FormRequest
             'end_actual' => 'nullable|date|after_or_equal:start_actual',
             'duration_actual' => 'nullable|integer|min:0',
             'percent_complete' => 'nullable|integer|min:0|max:100',
+            'budget_cost' => 'sometimes|numeric|min:0',
             // Optional task assignments payload
             'assignments' => 'sometimes|array',
             'assignments.*.user_id' => 'required|integer|exists:users,id',

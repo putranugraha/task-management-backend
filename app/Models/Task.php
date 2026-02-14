@@ -28,6 +28,7 @@ class Task extends Model
         'end_actual',
         'duration_actual',
         'percent_complete',
+        'budget_cost',
     ];
 
     /**
@@ -45,6 +46,7 @@ class Task extends Model
             'duration_planned' => 'integer',
             'duration_actual' => 'integer',
             'percent_complete' => 'integer',
+            'budget_cost' => 'decimal:2',
         ];
     }
 
@@ -87,6 +89,14 @@ class Task extends Model
     public function assignments()
     {
         return $this->hasMany(TaskAssignment::class);
+    }
+
+    /**
+     * Cost ledger entries (actual cost) associated with this task.
+     */
+    public function costEntries()
+    {
+        return $this->hasMany(TaskCostEntry::class);
     }
 }
 

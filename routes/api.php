@@ -20,9 +20,11 @@ use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\KpiSnapshotController;
 use App\Http\Controllers\EvmController;
+use App\Http\Controllers\EvmCostController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\TaskCostEntryController;
 
 // Public auth routes (throttled)
 Route::middleware(['throttle:6,1'])->group(function () {
@@ -125,6 +127,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::get('projects/{project}/kpi-snapshots/average-cycle-time', [KpiSnapshotController::class, 'averageCycleTimeByProject']);
     // EVM real-time aggregation
     Route::get('projects/{project}/evm', [EvmController::class, 'projectEvm']);
+    // EVM cost-based (IDR) aggregation (separate endpoint to avoid mixing units with effort-based EVM)
+    Route::get('projects/{project}/evm-cost', [EvmCostController::class, 'projectEvmCost']);
 });
 
 // Management for those with 'mengelola project'
@@ -242,6 +246,16 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::get('projects/{project}/time-entries/top-tasks', [TimeEntryController::class, 'topTasksByProject']);
 });
 
+// Cost Entries (Actual Cost ledger)
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+    Route::get('tasks/{task}/cost-entries', [TaskCostEntryController::class, 'index']);
+});
+
+Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
+    Route::post('tasks/{task}/cost-entries', [TaskCostEntryController::class, 'store']);
+    Route::delete('tasks/{task}/cost-entries/{costEntry}', [TaskCostEntryController::class, 'destroy']);
+});
+
 // Manage time entries
 Route::middleware(['auth:sanctum', 'active', 'permission:mengelola project'])->group(function () {
     Route::apiResource('time-entries', TimeEntryController::class)->only(['store','update','destroy']);
@@ -291,8 +305,6 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengelola lampiran'])->
     Route::patch('attachments/{attachment}/reject', [AttachmentController::class, 'reject']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
-
 
 
 

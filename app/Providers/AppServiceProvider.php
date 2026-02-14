@@ -67,6 +67,7 @@ use App\Services\Contracts\TaskServiceInterface;
 use App\Services\Contracts\TimeEntryServiceInterface;
 use App\Services\Contracts\KpiSnapshotServiceInterface;
 use App\Services\Contracts\EvmServiceInterface;
+use App\Services\Contracts\EvmCostServiceInterface;
 use App\Services\Contracts\UserServiceInterface;
 use App\Services\Implementations\AttachmentService;
 use App\Services\Implementations\CommentService;
@@ -85,6 +86,7 @@ use App\Services\Implementations\TaskService;
 use App\Services\Implementations\TimeEntryService;
 use App\Services\Implementations\KpiSnapshotService;
 use App\Services\Implementations\EvmService;
+use App\Services\Implementations\EvmCostService;
 use App\Services\Implementations\UserService;
 
 class AppServiceProvider extends ServiceProvider
@@ -145,6 +147,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(KpiSnapshotServiceInterface::class, KpiSnapshotService::class);
         // Bind EVM service
         $this->app->bind(EvmServiceInterface::class, EvmService::class);
+        // Bind EVM cost-based service (IDR)
+        $this->app->bind(EvmCostServiceInterface::class, EvmCostService::class);
         // Bind User interfaces to implementations
         $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
         $this->app->bind(UserServiceInterface::class, UserService::class);
