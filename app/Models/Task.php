@@ -98,5 +98,13 @@ class Task extends Model
     {
         return $this->hasMany(TaskCostEntry::class);
     }
+
+    /**
+     * Daily progress snapshots for historical EVM EV calculations.
+     */
+    public function progressEntries()
+    {
+        return $this->hasMany(TaskProgressEntry::class)->orderByDesc('progress_date')->orderByDesc('id');
+    }
 }
 

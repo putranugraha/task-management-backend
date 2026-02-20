@@ -7,6 +7,7 @@ use App\Models\ProjectBaseline;
 use App\Models\Task;
 use App\Models\TaskBaseline;
 use App\Models\TaskCostEntry;
+use App\Models\TaskProgressEntry;
 use App\Services\Contracts\EvmCostServiceInterface;
 use Carbon\Carbon;
 
@@ -42,6 +43,27 @@ class EvmCostService implements EvmCostServiceInterface
             ]);
 
         $taskIds = $tasks->pluck('id')->all();
+
+        // Historical progress (EV) up to as-of date: task_id -> percent_complete (latest <= asOfDate)
+        // Falls back to current percent only for "today" queries when no history exists yet.
+        $progressAsOf = [];
+        if (! empty($taskIds)) {
+            try {
+                $progressAsOf = TaskProgressEntry::query()
+                    ->whereIn('task_id', $taskIds)
+                    ->whereDate('progress_date', '<=', $asOfDate)
+                    ->selectRaw('DISTINCT ON (task_id) task_id, percent_complete')
+                    ->orderBy('task_id')
+                    ->orderByDesc('progress_date')
+                    ->orderByDesc('id')
+                    ->pluck('percent_complete', 'task_id')
+                    ->toArray();
+            } catch (\Throwable $e) {
+                // If the table doesn't exist yet (pre-migration) or driver doesn't support DISTINCT ON,
+                // simply keep progressAsOf empty and rely on safe fallbacks below.
+                $progressAsOf = [];
+            }
+        }
 
         // Baseline schedule map: task_id -> [start_planned_base, duration_planned_base]
         $taskBaselineMap = [];
@@ -84,7 +106,16 @@ class EvmCostService implements EvmCostServiceInterface
 
             $fraction = $this->plannedFractionInclusiveDays($asOf, $startPlanned, $durationPlanned);
 
-            $pct = (int) ($task->percent_complete ?? 0);
+            $today = Carbon::today()->toDateString();
+            if (array_key_exists($taskId, $progressAsOf)) {
+                $pct = (int) $progressAsOf[$taskId];
+            } elseif ($asOfDate === $today) {
+                // For "today", allow current percent as a fallback if history hasn't been written yet.
+                $pct = (int) ($task->percent_complete ?? 0);
+            } else {
+                // For past dates without history, treat as 0 to avoid using future progress.
+                $pct = 0;
+            }
             if ($pct < 0) $pct = 0;
             if ($pct > 100) $pct = 100;
 
@@ -171,4 +202,3 @@ class EvmCostService implements EvmCostServiceInterface
         return $durationDays > 0 ? ($elapsed / $durationDays) : 0.0;
     }
 }
-

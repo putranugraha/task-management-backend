@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Models\User;
 use App\Models\StatusHistory;
 use App\Models\Task;
+use App\Models\TaskProgressEntry;
 use App\Models\Milestone;
 use App\Notifications\TaskActivityNotification;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +46,19 @@ class TaskService implements TaskServiceInterface
         $this->repository = $repository;
         $this->taskBaselineService = $taskBaselineService;
         $this->projectBaselineService = $projectBaselineService;
+    }
+
+    protected function recordProgressEntryForToday(Task $task): void
+    {
+        $date = Carbon::today()->toDateString();
+        $pct = (int) ($task->percent_complete ?? 0);
+        if ($pct < 0) $pct = 0;
+        if ($pct > 100) $pct = 100;
+
+        TaskProgressEntry::updateOrCreate(
+            ['task_id' => (int) $task->id, 'progress_date' => $date],
+            ['percent_complete' => $pct, 'changed_by' => Auth::id()]
+        );
     }
 
     public function getAllTasks()
@@ -171,6 +185,9 @@ class TaskService implements TaskServiceInterface
         if ($task) {
             $task->loadMissing(['project', 'milestone', 'assignments.user', 'dependencies.dependsOn']);
 
+            // Ensure progress history has a baseline snapshot for today (even when created with non-zero progress).
+            $this->recordProgressEntryForToday($task);
+
             // Ensure a project baseline exists; create if missing
             $latest = $this->projectBaselineService->getLatestBaselineByProject($task->project_id);
             if (!$latest) {
@@ -289,6 +306,10 @@ class TaskService implements TaskServiceInterface
         if ($task) {
             // Notify only users who are newly assigned compared to the previous snapshot.
             $this->notifyAssigneesForTask($task, $previousUserIds);
+
+            if ((int) ($before->percent_complete ?? 0) !== (int) ($task->percent_complete ?? 0)) {
+                $this->recordProgressEntryForToday($task);
+            }
 
             $actor = Auth::user();
 
@@ -420,6 +441,8 @@ class TaskService implements TaskServiceInterface
         );
 
         if ($task) {
+            $this->recordProgressEntryForToday($task);
+
             $actor = Auth::user();
 
             $properties = [
@@ -456,6 +479,8 @@ class TaskService implements TaskServiceInterface
             $task->milestone_id ?? null,
         );
         if ($task) {
+            $this->recordProgressEntryForToday($task);
+
             StatusHistory::create([
                 'task_id' => $task->id,
                 'from_status' => $before->status ?? null,

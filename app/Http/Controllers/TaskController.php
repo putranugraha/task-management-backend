@@ -8,7 +8,9 @@ use App\Http\Requests\TaskStoreRequest;
 use App\Http\Requests\TaskUpdateRequest;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\TaskProgressEntry;
 use App\Services\Contracts\TaskServiceInterface;
+use Illuminate\Support\Facades\Auth;
 
 class TaskController extends Controller
 {
@@ -240,16 +242,63 @@ class TaskController extends Controller
     {
         $request->validate([
             'percent' => 'required|integer|min:0|max:100',
+            'progress_date' => 'nullable|date_format:Y-m-d',
         ]);
         $task = $this->service->updateTaskProgress($id, (int) $request->input('percent'));
         if (!$task) return response()->json(['message' => 'Gagal update progres atau task tidak ditemukan'], 400);
-        return new TaskResource($task);
+
+        $progressDate = $request->input('progress_date');
+        $wroteProgressDate = null;
+        if (is_string($progressDate) && $progressDate !== '') {
+            // Debug/testing support: write a progress entry for an arbitrary date.
+            // Guarded by local env (or APP_DEBUG) so production behavior is unchanged.
+            $allowDebug = app()->environment('local') || config('app.debug');
+            if ($allowDebug) {
+                TaskProgressEntry::updateOrCreate(
+                    ['task_id' => (int) $task->id, 'progress_date' => $progressDate],
+                    ['percent_complete' => (int) $task->percent_complete, 'changed_by' => Auth::id()]
+                );
+                $wroteProgressDate = $progressDate;
+            }
+        }
+
+        $res = (new TaskResource($task))->response();
+        if (app()->environment('local') || config('app.debug')) {
+            $res->headers->set('X-Debug-Progress-Date-Received', is_string($progressDate) ? $progressDate : '');
+            $res->headers->set('X-Debug-Progress-Date-Written', is_string($wroteProgressDate) ? $wroteProgressDate : '');
+            $res->headers->set('X-Debug-Env', (string) config('app.env'));
+        }
+        return $res;
     }
 
     public function complete(string $id)
     {
+        $request = request();
+        $request->validate([
+            'progress_date' => 'nullable|date_format:Y-m-d',
+        ]);
         $task = $this->service->completeTask($id);
         if (!$task) return response()->json(['message' => 'Task tidak ditemukan'], 404);
-        return new TaskResource($task);
+
+        $progressDate = $request->input('progress_date');
+        $wroteProgressDate = null;
+        if (is_string($progressDate) && $progressDate !== '') {
+            $allowDebug = app()->environment('local') || config('app.debug');
+            if ($allowDebug) {
+                TaskProgressEntry::updateOrCreate(
+                    ['task_id' => (int) $task->id, 'progress_date' => $progressDate],
+                    ['percent_complete' => 100, 'changed_by' => Auth::id()]
+                );
+                $wroteProgressDate = $progressDate;
+            }
+        }
+
+        $res = (new TaskResource($task))->response();
+        if (app()->environment('local') || config('app.debug')) {
+            $res->headers->set('X-Debug-Progress-Date-Received', is_string($progressDate) ? $progressDate : '');
+            $res->headers->set('X-Debug-Progress-Date-Written', is_string($wroteProgressDate) ? $wroteProgressDate : '');
+            $res->headers->set('X-Debug-Env', (string) config('app.env'));
+        }
+        return $res;
     }
 }
