@@ -7,6 +7,7 @@ use App\Http\Resources\TaskCostEntryResource;
 use App\Models\Task;
 use App\Models\TaskCostEntry;
 use Illuminate\Http\Request;
+use App\Support\TaskHistoryLogger;
 
 class TaskCostEntryController extends Controller
 {
@@ -49,6 +50,19 @@ class TaskCostEntryController extends Controller
 
         $row = $task->costEntries()->create($data);
 
+        $actorId = $request->user()?->id;
+        $amount = $row->amount ?? null;
+        $category = $row->category ?? null;
+        $date = $row->incurred_on ?? null;
+        $note = 'Cost entry ditambahkan'.($date ? (': '.$date) : '');
+        if ($amount !== null) {
+            $note .= ' (amount: '.$amount.')';
+        }
+        if ($category) {
+            $note .= ' (kategori: '.$category.')';
+        }
+        TaskHistoryLogger::log($task, $actorId, $note);
+
         return new TaskCostEntryResource($row);
     }
 
@@ -61,9 +75,22 @@ class TaskCostEntryController extends Controller
             abort(404);
         }
 
+        $actorId = request()->user()?->id;
+        $amount = $costEntry->amount ?? null;
+        $category = $costEntry->category ?? null;
+        $date = $costEntry->incurred_on ?? null;
+
         $costEntry->delete();
+
+        $note = 'Cost entry dihapus'.($date ? (': '.$date) : '');
+        if ($amount !== null) {
+            $note .= ' (amount: '.$amount.')';
+        }
+        if ($category) {
+            $note .= ' (kategori: '.$category.')';
+        }
+        TaskHistoryLogger::log($task, $actorId, $note);
 
         return response()->json(['message' => 'Cost entry berhasil dihapus']);
     }
 }
-

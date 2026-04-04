@@ -110,7 +110,6 @@ class ReportingPeriodService implements ReportingPeriodServiceInterface
     protected function normaliseDateKey($value): ?string
     {
         if ($value instanceof \DateTimeInterface) {
-            return $value->format('Y-m-d');
         }
 
         return $value ?: null;

@@ -9,8 +9,10 @@ use App\Http\Requests\TaskTimeEntryStoreRequest;
 use App\Http\Resources\TimeEntryResource;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TimeEntry;
 use App\Services\Contracts\TimeEntryServiceInterface;
 use Illuminate\Support\Carbon;
+use App\Support\TaskHistoryLogger;
 
 class TimeEntryController extends Controller
 {
@@ -96,6 +98,9 @@ class TimeEntryController extends Controller
     {
         $row = $this->service->createTimeEntry($request->validated());
         if (!$row) return response()->json(['message' => 'Gagal membuat time entry (mungkin duplikat tanggal untuk user/task).'], 400);
+        $actorId = $request->user()?->id;
+        $note = 'Time entry ditambahkan: '.$row->date.' ('.$row->hours.' jam)';
+        TaskHistoryLogger::logByTaskId((int) ($row->task_id ?? 0), $actorId, $note);
         return new TimeEntryResource($row);
     }
 
@@ -119,6 +124,10 @@ class TimeEntryController extends Controller
             return response()->json(['message' => 'Gagal membuat time entry (mungkin duplikat tanggal untuk user/task).'], 400);
         }
 
+        $actorId = $request->user()?->id;
+        $note = 'Time entry ditambahkan: '.$row->date.' ('.$row->hours.' jam)';
+        TaskHistoryLogger::log($task, $actorId, $note);
+
         return new TimeEntryResource($row);
     }
 
@@ -128,7 +137,22 @@ class TimeEntryController extends Controller
      */
     public function storeOrUpdate(TimeEntryStoreRequest $request)
     {
-        $row = $this->service->createOrUpdate($request->validated());
+        $data = $request->validated();
+        $before = TimeEntry::where('task_id', $data['task_id'])
+            ->where('user_id', $data['user_id'])
+            ->where('date', $data['date'])
+            ->first();
+
+        $row = $this->service->createOrUpdate($data);
+
+        $actorId = $request->user()?->id;
+        $date = (string) ($row->date ?? $data['date']);
+        $beforeHours = $before?->hours ?? null;
+        $afterHours = $row->hours ?? null;
+        $note = $before
+            ? ('Time entry diperbarui: '.$date.' ('.$beforeHours.' -> '.$afterHours.' jam)')
+            : ('Time entry ditambahkan: '.$date.' ('.$afterHours.' jam)');
+        TaskHistoryLogger::logByTaskId((int) ($row->task_id ?? $data['task_id']), $actorId, $note);
         return new TimeEntryResource($row);
     }
 
@@ -147,7 +171,21 @@ class TimeEntryController extends Controller
         $data['task_id'] = $task->id;
         $data['user_id'] = $userId;
 
+        $before = TimeEntry::where('task_id', $data['task_id'])
+            ->where('user_id', $data['user_id'])
+            ->where('date', $data['date'])
+            ->first();
+
         $row = $this->service->createOrUpdate($data);
+
+        $actorId = $request->user()?->id;
+        $date = (string) ($row->date ?? $data['date']);
+        $beforeHours = $before?->hours ?? null;
+        $afterHours = $row->hours ?? null;
+        $note = $before
+            ? ('Time entry diperbarui: '.$date.' ('.$beforeHours.' -> '.$afterHours.' jam)')
+            : ('Time entry ditambahkan: '.$date.' ('.$afterHours.' jam)');
+        TaskHistoryLogger::log($task, $actorId, $note);
         return new TimeEntryResource($row);
     }
 
@@ -166,15 +204,28 @@ class TimeEntryController extends Controller
 
     public function update(TimeEntryUpdateRequest $request, string $id)
     {
+        $before = $this->service->getTimeEntryById($id);
         $row = $this->service->updateTimeEntry($id, $request->validated());
         if (!$row) return response()->json(['message' => 'Time entry tidak ditemukan atau invalid'], 404);
+        $actorId = $request->user()?->id;
+        $beforeHours = $before?->hours ?? null;
+        $afterHours = $row->hours ?? null;
+        $date = (string) ($row->date ?? ($before?->date ?? ''));
+        $note = 'Time entry diperbarui'.($date !== '' ? (': '.$date) : '').' ('.$beforeHours.' -> '.$afterHours.' jam)';
+        TaskHistoryLogger::logByTaskId((int) ($row->task_id ?? 0), $actorId, $note);
         return new TimeEntryResource($row);
     }
 
     public function destroy(string $id)
     {
+        $before = $this->service->getTimeEntryById($id);
         $deleted = $this->service->deleteTimeEntry($id);
         if (!$deleted) return response()->json(['message' => 'Time entry tidak ditemukan'], 404);
+        $actorId = request()->user()?->id;
+        if ($before) {
+            $note = 'Time entry dihapus: '.$before->date.' ('.$before->hours.' jam)';
+            TaskHistoryLogger::logByTaskId((int) ($before->task_id ?? 0), $actorId, $note);
+        }
         return response()->json(['message' => 'Time entry berhasil dihapus']);
     }
 

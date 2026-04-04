@@ -9,10 +9,12 @@ use App\Http\Requests\AttachmentUpdateRequest;
 use App\Http\Requests\AttachmentUploadRequest;
 use App\Http\Resources\AttachmentResource;
 use App\Models\Task;
+use App\Models\Attachment;
 use App\Models\TaskAssignment;
 use App\Models\User;
 use App\Notifications\TaskActivityNotification;
 use App\Services\Contracts\AttachmentServiceInterface;
+use App\Support\TaskHistoryLogger;
 
 class AttachmentController extends Controller
 {
@@ -80,6 +82,13 @@ class AttachmentController extends Controller
     {
         $row = $this->service->createAttachment($request->validated());
         if (!$row) return response()->json(['message' => 'Gagal membuat attachment'], 400);
+        if (($row->entity_type ?? null) === 'Task') {
+            $task = Task::find($row->entity_id);
+            $actorId = $request->user()?->id;
+            $filename = $row->filename ?? null;
+            $note = $filename ? ('Attachment ditambahkan: '.$filename) : 'Attachment ditambahkan';
+            TaskHistoryLogger::log($task, $actorId, $note);
+        }
         return new AttachmentResource($row);
     }
 
@@ -110,6 +119,10 @@ class AttachmentController extends Controller
         if (!$row) return response()->json(['message' => 'Gagal mengunggah attachment'], 400);
 
         $actor = $request->user();
+        $filename = $row->filename ?? ($file?->getClientOriginalName() ?? null);
+        $note = $filename ? ('Attachment di-upload: '.$filename) : 'Attachment di-upload';
+        TaskHistoryLogger::log($task, $actor?->id, $note);
+
         $payload = [
             'task_id' => $task->id,
             'task_title' => $task->title,
@@ -158,15 +171,36 @@ class AttachmentController extends Controller
 
     public function update(AttachmentUpdateRequest $request, string $id)
     {
+        $before = $this->service->getAttachmentById($id);
         $row = $this->service->updateAttachment($id, $request->validated());
         if (!$row) return response()->json(['message' => 'Attachment tidak ditemukan atau invalid'], 404);
+        if (($row->entity_type ?? null) === 'Task') {
+            $task = Task::find($row->entity_id);
+            $actorId = $request->user()?->id;
+            $filename = $row->filename ?? null;
+            $note = $filename ? ('Attachment diperbarui: '.$filename) : 'Attachment diperbarui';
+            $beforeStatus = $before?->status ?? null;
+            $afterStatus = $row->status ?? null;
+            if ($beforeStatus !== null && $afterStatus !== null && $beforeStatus !== $afterStatus) {
+                $note .= ' (status: '.$beforeStatus.' -> '.$afterStatus.')';
+            }
+            TaskHistoryLogger::log($task, $actorId, $note);
+        }
         return new AttachmentResource($row);
     }
 
     public function destroy(string $id)
     {
+        $before = $this->service->getAttachmentById($id);
         $deleted = $this->service->deleteAttachment($id);
         if (!$deleted) return response()->json(['message' => 'Attachment tidak ditemukan'], 404);
+        if (($before?->entity_type ?? null) === 'Task') {
+            $task = Task::find($before->entity_id);
+            $actorId = request()->user()?->id;
+            $filename = $before->filename ?? null;
+            $note = $filename ? ('Attachment dihapus: '.$filename) : 'Attachment dihapus';
+            TaskHistoryLogger::log($task, $actorId, $note);
+        }
         return response()->json(['message' => 'Attachment berhasil dihapus']);
     }
 
@@ -255,6 +289,12 @@ class AttachmentController extends Controller
             }
 
             $target->notify(new TaskActivityNotification('attachment_approved', $payload));
+        }
+
+        if ($task) {
+            $filename = $row->filename ?? null;
+            $note = $filename ? ('Attachment di-approve: '.$filename) : 'Attachment di-approve';
+            TaskHistoryLogger::log($task, $actor->id, $note);
         }
 
         return new AttachmentResource($row->loadMissing('verifier'));
@@ -347,6 +387,12 @@ class AttachmentController extends Controller
             $target->notify(new TaskActivityNotification('attachment_rejected', $payload));
         }
 
+        if ($task) {
+            $filename = $row->filename ?? null;
+            $note = $filename ? ('Attachment di-reject: '.$filename) : 'Attachment di-reject';
+            TaskHistoryLogger::log($task, $actor->id, $note);
+        }
+
         return new AttachmentResource($row->loadMissing('verifier'));
     }
 
@@ -356,8 +402,22 @@ class AttachmentController extends Controller
             'entity_type' => 'required|in:Task,Project,Milestone',
             'entity_id' => 'required|integer',
         ]);
-        $deleted = $this->service->deleteAttachmentsByEntity($request->input('entity_type'), (int) $request->input('entity_id'));
+        $entityType = $request->input('entity_type');
+        $entityId = (int) $request->input('entity_id');
+        $count = null;
+        if ($entityType === 'Task') {
+            $count = Attachment::where('entity_type', 'Task')->where('entity_id', $entityId)->count();
+        }
+
+        $deleted = $this->service->deleteAttachmentsByEntity($entityType, $entityId);
         if (!$deleted) return response()->json(['message' => 'Tidak ada attachment dihapus atau entity tidak ditemukan'], 404);
+
+        if ($entityType === 'Task') {
+            $task = Task::find($entityId);
+            $actorId = $request->user()?->id;
+            $note = 'Seluruh attachment dihapus'.(is_int($count) ? (' (jumlah: '.$count.')') : '');
+            TaskHistoryLogger::log($task, $actorId, $note);
+        }
         return response()->json(['message' => 'Seluruh attachment untuk entity dihapus']);
     }
 

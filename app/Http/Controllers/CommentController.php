@@ -11,6 +11,7 @@ use App\Models\TaskAssignment;
 use App\Models\User;
 use App\Notifications\TaskActivityNotification;
 use App\Services\Contracts\CommentServiceInterface;
+use App\Support\TaskHistoryLogger;
 
 class CommentController extends Controller
 {
@@ -87,6 +88,14 @@ class CommentController extends Controller
             $task = Task::find($row->entity_id);
 
             if ($task) {
+                $snippet = trim((string) ($row->content ?? ''));
+                $snippet = preg_replace('/\s+/', ' ', $snippet ?? '') ?? '';
+                if (strlen($snippet) > 120) {
+                    $snippet = substr($snippet, 0, 117).'...';
+                }
+                $note = 'Komentar ditambahkan'.($snippet !== '' ? (': '.$snippet) : '');
+                TaskHistoryLogger::log($task, $actor?->id, $note);
+
                 $payload = [
                     'task_id' => $task->id,
                     'task_title' => $task->title,
@@ -138,15 +147,31 @@ class CommentController extends Controller
 
     public function update(CommentUpdateRequest $request, string $id)
     {
+        $before = $this->service->getCommentById($id);
         $row = $this->service->updateComment($id, $request->validated());
         if (!$row) return response()->json(['message' => 'Komentar tidak ditemukan atau invalid'], 404);
+        if (($row->entity_type ?? null) === 'Task') {
+            $task = Task::find($row->entity_id);
+            $actorId = $request->user()?->id;
+            $note = 'Komentar diperbarui';
+            if ($before && ($before->content ?? null) !== ($row->content ?? null)) {
+                $note .= ' (konten berubah)';
+            }
+            TaskHistoryLogger::log($task, $actorId, $note);
+        }
         return new CommentResource($row);
     }
 
     public function destroy(string $id)
     {
+        $before = $this->service->getCommentById($id);
         $deleted = $this->service->deleteComment($id);
         if (!$deleted) return response()->json(['message' => 'Komentar tidak ditemukan'], 404);
+        if (($before?->entity_type ?? null) === 'Task') {
+            $task = Task::find($before->entity_id);
+            $actorId = request()->user()?->id;
+            TaskHistoryLogger::log($task, $actorId, 'Komentar dihapus');
+        }
         return response()->json(['message' => 'Komentar berhasil dihapus']);
     }
 
@@ -156,8 +181,15 @@ class CommentController extends Controller
             'entity_type' => 'required|in:Task,Project,Milestone',
             'entity_id' => 'required|integer',
         ]);
-        $deleted = $this->service->deleteCommentsByEntity($request->input('entity_type'), (int) $request->input('entity_id'));
+        $entityType = $request->input('entity_type');
+        $entityId = (int) $request->input('entity_id');
+        $deleted = $this->service->deleteCommentsByEntity($entityType, $entityId);
         if (!$deleted) return response()->json(['message' => 'Tidak ada komentar dihapus atau entity tidak ditemukan'], 404);
+        if ($entityType === 'Task') {
+            $task = Task::find($entityId);
+            $actorId = $request->user()?->id;
+            TaskHistoryLogger::log($task, $actorId, 'Seluruh komentar dihapus');
+        }
         return response()->json(['message' => 'Seluruh komentar untuk entity dihapus']);
     }
 

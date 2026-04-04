@@ -28,9 +28,9 @@ class StatusHistoryResource extends JsonResource
                     'name' => $this->changer->name,
                 ];
             }),
-            'created_at' => optional($this->created_at)->toDateTimeString(),
-            'updated_at' => optional($this->updated_at)->toDateTimeString(),
+            // Use ISO 8601 with timezone offset so FE date parsing is consistent across browsers/timezones.
+            'created_at' => optional($this->created_at)->toIso8601String(),
+            'updated_at' => optional($this->updated_at)->toIso8601String(),
         ];
     }
 }
-

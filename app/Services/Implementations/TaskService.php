@@ -304,6 +304,174 @@ class TaskService implements TaskServiceInterface
         $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
 
         if ($task) {
+            // Create status history entry when task is updated (status change OR details change).
+            if ($before) {
+                $noteParts = [];
+
+                $beforeStatus = $before->status ?? null;
+                $afterStatus = $task->status ?? null;
+
+                $stringifyDate = function ($value) {
+                    if ($value instanceof \Carbon\Carbon) {
+                        return $value->toDateString();
+                    }
+                    if ($value instanceof \DateTimeInterface) {
+                        return $value->format('Y-m-d');
+                    }
+                    if (is_string($value) && $value !== '') {
+                        // Some fields may already be strings (e.g., from JSON resource).
+                        return $value;
+                    }
+                    return $value;
+                };
+
+                $norm = function ($value) use ($stringifyDate) {
+                    $value = $stringifyDate($value);
+                    if (is_bool($value)) return $value ? '1' : '0';
+                    if ($value === null) return null;
+                    if (is_numeric($value)) {
+                        // Normalize numeric strings like "10.00" to "10" for comparisons.
+                        $s = (string) $value;
+                        if (str_contains($s, '.')) {
+                            $s = rtrim(rtrim($s, '0'), '.');
+                        }
+                        return $s;
+                    }
+                    if (is_string($value)) {
+                        $t = trim($value);
+                        return $t === '' ? null : $t;
+                    }
+                    return (string) $value;
+                };
+
+                $pushChange = function (string $label, $beforeVal, $afterVal) use (&$noteParts, $norm) {
+                    $b = $norm($beforeVal);
+                    $a = $norm($afterVal);
+                    if ($b === $a) return;
+
+                    // Avoid storing full description diffs in history notes.
+                    if (strtolower($label) === 'deskripsi') {
+                        $noteParts[] = 'Deskripsi diperbarui';
+                        return;
+                    }
+
+                    $short = function ($v) {
+                        if ($v === null) return '-';
+                        $s = (string) $v;
+                        $s = preg_replace('/\s+/', ' ', $s ?? '');
+                        if (strlen($s) > 80) {
+                            $s = substr($s, 0, 77).'...';
+                        }
+                        return $s;
+                    };
+
+                    $noteParts[] = $label.': '.$short($b).' -> '.$short($a);
+                };
+
+                $pushChange('Project', $before->project_id ?? null, $task->project_id ?? null);
+                $pushChange('Milestone', $before->milestone_id ?? null, $task->milestone_id ?? null);
+                $pushChange('Judul', $before->title ?? null, $task->title ?? null);
+                $pushChange('Deskripsi', $before->description ?? null, $task->description ?? null);
+                $pushChange('Prioritas', $before->priority ?? null, $task->priority ?? null);
+                $pushChange('Start Planned', $before->start_planned ?? null, $task->start_planned ?? null);
+                $pushChange('End Planned', $before->end_planned ?? null, $task->end_planned ?? null);
+                $pushChange('Progress', (int) ($before->percent_complete ?? 0), (int) ($task->percent_complete ?? 0));
+                $pushChange('Budget', $before->budget_cost ?? null, $task->budget_cost ?? null);
+
+                if ($assignments !== null) {
+                    $beforeAssignees = collect($before->assignments ?? [])
+                        ->map(function ($a) {
+                            return [
+                                'user_id' => (int) ($a->user_id ?? 0),
+                                'role_on_task' => $a->role_on_task ?? null,
+                                'estimated_effort_hours' => $a->estimated_effort_hours ?? null,
+                            ];
+                        })
+                        ->filter(fn ($a) => ($a['user_id'] ?? 0) > 0)
+                        ->sortBy('user_id')
+                        ->values()
+                        ->all();
+
+                    $afterAssignees = collect($task->assignments ?? [])
+                        ->map(function ($a) {
+                            return [
+                                'user_id' => (int) ($a->user_id ?? 0),
+                                'role_on_task' => $a->role_on_task ?? null,
+                                'estimated_effort_hours' => $a->estimated_effort_hours ?? null,
+                            ];
+                        })
+                        ->filter(fn ($a) => ($a['user_id'] ?? 0) > 0)
+                        ->sortBy('user_id')
+                        ->values()
+                        ->all();
+
+                    if (json_encode($beforeAssignees) !== json_encode($afterAssignees)) {
+                        $beforeIds = collect($beforeAssignees)->pluck('user_id')->values()->all();
+                        $afterIds = collect($afterAssignees)->pluck('user_id')->values()->all();
+                        $noteParts[] = 'Assignee: ['.implode(',', $beforeIds).'] -> ['.implode(',', $afterIds).']';
+                    }
+                }
+
+                if ($dependencies !== null) {
+                    $beforeDeps = collect($before->dependencies ?? [])
+                        ->map(function ($d) {
+                            return [
+                                'depends_on_task_id' => (int) ($d->depends_on_task_id ?? ($d->dependsOn->id ?? 0)),
+                                'type' => (string) ($d->type ?? 'FS'),
+                                'lag_days' => (int) ($d->lag_days ?? 0),
+                            ];
+                        })
+                        ->filter(fn ($d) => ($d['depends_on_task_id'] ?? 0) > 0)
+                        ->sortBy(function ($d) {
+                            return sprintf('%010d|%s|%06d', (int) ($d['depends_on_task_id'] ?? 0), (string) ($d['type'] ?? ''), (int) ($d['lag_days'] ?? 0));
+                        })
+                        ->values()
+                        ->all();
+
+                    $afterDeps = collect($task->dependencies ?? [])
+                        ->map(function ($d) {
+                            return [
+                                'depends_on_task_id' => (int) ($d->depends_on_task_id ?? ($d->dependsOn->id ?? 0)),
+                                'type' => (string) ($d->type ?? 'FS'),
+                                'lag_days' => (int) ($d->lag_days ?? 0),
+                            ];
+                        })
+                        ->filter(fn ($d) => ($d['depends_on_task_id'] ?? 0) > 0)
+                        ->sortBy(function ($d) {
+                            return sprintf('%010d|%s|%06d', (int) ($d['depends_on_task_id'] ?? 0), (string) ($d['type'] ?? ''), (int) ($d['lag_days'] ?? 0));
+                        })
+                        ->values()
+                        ->all();
+
+                    if (json_encode($beforeDeps) !== json_encode($afterDeps)) {
+                        $beforeIds = collect($beforeDeps)->pluck('depends_on_task_id')->values()->all();
+                        $afterIds = collect($afterDeps)->pluck('depends_on_task_id')->values()->all();
+                        $noteParts[] = 'Dependency: ['.implode(',', $beforeIds).'] -> ['.implode(',', $afterIds).']';
+                    }
+                }
+
+                $statusChanged = ($beforeStatus !== $afterStatus);
+                $hasDetailChanges = !empty($noteParts) || $statusChanged;
+
+                if ($hasDetailChanges) {
+                    $note = null;
+                    if (!empty($noteParts)) {
+                        $note = implode('; ', $noteParts);
+                        if (strlen($note) > 1500) {
+                            $note = substr($note, 0, 1497).'...';
+                        }
+                    }
+
+                    StatusHistory::create([
+                        'task_id' => $task->id,
+                        'from_status' => $statusChanged ? $beforeStatus : ($afterStatus ?? $beforeStatus),
+                        'to_status' => $afterStatus ?? ($beforeStatus ?? 'To Do'),
+                        'changed_by' => Auth::id(),
+                        'note' => $note,
+                    ]);
+                }
+            }
+
             // Notify only users who are newly assigned compared to the previous snapshot.
             $this->notifyAssigneesForTask($task, $previousUserIds);
 
@@ -442,6 +610,20 @@ class TaskService implements TaskServiceInterface
 
         if ($task) {
             $this->recordProgressEntryForToday($task);
+
+            // Record progress update in status history so it appears in "Status History" feed.
+            $beforePct = (int) ($before->percent_complete ?? 0);
+            $afterPct = (int) ($task->percent_complete ?? 0);
+            if ($before && $beforePct !== $afterPct) {
+                $status = $task->status ?? ($before->status ?? 'To Do');
+                StatusHistory::create([
+                    'task_id' => $task->id,
+                    'from_status' => $status,
+                    'to_status' => $status,
+                    'changed_by' => Auth::id(),
+                    'note' => 'Progress: '.$beforePct.' -> '.$afterPct,
+                ]);
+            }
 
             $actor = Auth::user();
 
