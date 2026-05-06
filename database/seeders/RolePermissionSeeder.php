@@ -17,19 +17,39 @@ class RolePermissionSeeder extends Seeder
         // Reset cached roles and permissions
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Permissions aligned with project (pluralized where applicable)
+        // Permissions aligned with CRUD actions. Legacy "mengelola ..."
+        // permissions are intentionally not seeded for new installs.
         $permissions = [
-            'mengelola users',
-            'mengelola roles',
-            'mengelola permissions',
-            'mengelola project',
-            'mengelola tugas',
+            'melihat users',
+            'membuat users',
+            'mengubah users',
+            'menghapus users',
+            'melihat roles',
+            'membuat roles',
+            'mengubah roles',
+            'menghapus roles',
+            'melihat permissions',
+            'membuat permissions',
+            'mengubah permissions',
+            'menghapus permissions',
+            'melihat project',
+            'membuat project',
+            'mengubah project',
+            'menghapus project',
+            'melihat tugas',
+            'membuat tugas',
+            'mengubah tugas',
+            'menghapus tugas',
             'mengelola tugas sendiri',
             'mengisi entri waktu',
-            'mengelola komentar',
-            'mengelola lampiran',
-            'melihat project',
-            'melihat tugas',
+            'melihat komentar',
+            'membuat komentar',
+            'mengubah komentar',
+            'menghapus komentar',
+            'melihat lampiran',
+            'membuat lampiran',
+            'mengubah lampiran',
+            'menghapus lampiran',
             'melihat laporan pribadi',
             'mencetak laporan',
         ];
@@ -48,9 +68,18 @@ class RolePermissionSeeder extends Seeder
 
         // Manager: all except managing users/roles/permissions
         $managerDisallowed = [
-            'mengelola users',
-            'mengelola roles',
-            'mengelola permissions',
+            'melihat users',
+            'membuat users',
+            'mengubah users',
+            'menghapus users',
+            'melihat roles',
+            'membuat roles',
+            'mengubah roles',
+            'menghapus roles',
+            'melihat permissions',
+            'membuat permissions',
+            'mengubah permissions',
+            'menghapus permissions',
         ];
         $managerPermissions = Permission::whereNotIn('name', $managerDisallowed)->get();
         $manager->syncPermissions($managerPermissions);
@@ -61,8 +90,14 @@ class RolePermissionSeeder extends Seeder
             Permission::where('name', 'melihat tugas')->first(),
             Permission::where('name', 'mengelola tugas sendiri')->first(),
             Permission::where('name', 'mengisi entri waktu')->first(),
-            Permission::where('name', 'mengelola komentar')->first(),
-            Permission::where('name', 'mengelola lampiran')->first(),
+            Permission::where('name', 'melihat komentar')->first(),
+            Permission::where('name', 'membuat komentar')->first(),
+            Permission::where('name', 'mengubah komentar')->first(),
+            Permission::where('name', 'menghapus komentar')->first(),
+            Permission::where('name', 'melihat lampiran')->first(),
+            Permission::where('name', 'membuat lampiran')->first(),
+            Permission::where('name', 'mengubah lampiran')->first(),
+            Permission::where('name', 'menghapus lampiran')->first(),
             Permission::where('name', 'melihat laporan pribadi')->first(),
         ]);
     }

@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use App\Http\Resources\UserResource;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -37,11 +36,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Akun Anda tidak aktif.'], 403);
         }
 
-        $user->forceFill([
-            'last_login_at' => Carbon::now(),
-        ])->save();
-
-        $user->loadMissing('division', 'roles');
+        $user->loadMissing('roles');
 
         $primaryRole = $user->roles->first()->name ?? null;
         $dashboardType = match ($primaryRole) {
@@ -58,17 +53,41 @@ class AuthController extends Controller
         };
 
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
+        if (!app()->environment('local')) {
+            $userId = $user->id;
+            $ip = $request->ip();
+            $userAgent = $request->userAgent();
+            dispatch(function () use ($userId, $ip, $userAgent) {
+                $freshUser = User::find($userId);
+                if (!$freshUser) {
+                    return;
+                }
 
-        activity('auth')
-            ->causedBy($user)
-            ->withProperties([
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ])
-            ->log('login');
+                $freshUser->forceFill([
+                    'last_login_at' => Carbon::now(),
+                ])->save();
+
+                activity('auth')
+                    ->causedBy($freshUser)
+                    ->withProperties([
+                        'ip' => $ip,
+                        'user_agent' => $userAgent,
+                    ])
+                    ->log('login');
+            })->afterResponse();
+        }
 
         return response()->json([
-            'user' => new UserResource($user),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'job_title' => $user->job_title,
+                'is_active' => (bool) $user->is_active,
+                'status' => $user->status,
+                'last_login_at' => optional($user->last_login_at)->toDateTimeString(),
+                'role' => $primaryRole,
+            ],
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
             'primary_role' => $primaryRole,
@@ -120,7 +139,7 @@ class AuthController extends Controller
             $user->currentAccessToken()?->delete();
         }
 
-        if ($user) {
+        if ($user && !app()->environment('local')) {
             activity('auth')
                 ->causedBy($user)
                 ->withProperties([

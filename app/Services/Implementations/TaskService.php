@@ -15,6 +15,7 @@ use App\Models\Milestone;
 use App\Notifications\TaskActivityNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Carbon\Carbon;
 
 class TaskService implements TaskServiceInterface
@@ -141,10 +142,17 @@ class TaskService implements TaskServiceInterface
 
     public function createTask(array $data)
     {
+        $requestedStatus = isset($data['status']) && is_string($data['status'])
+            ? $data['status']
+            : null;
         $assignments = $data['assignments'] ?? null;
         $dependencies = $data['dependencies'] ?? null;
         unset($data['assignments']);
         unset($data['dependencies']);
+
+        if ($requestedStatus !== null && in_array($requestedStatus, ['In Progress', 'Done'], true)) {
+            $this->assertDependencyPayloadTransitionAllowed($dependencies, $requestedStatus);
+        }
 
         $task = null;
         DB::transaction(function () use (&$task, $data, $assignments, $dependencies) {
@@ -239,6 +247,18 @@ class TaskService implements TaskServiceInterface
 
     public function updateTask($id, array $data)
     {
+        if (array_key_exists('status', $data) && is_string($data['status'])) {
+            $currentTask = $this->repository->getTaskById($id);
+            if ($currentTask instanceof Task) {
+                $requestedDependencies = $data['dependencies'] ?? null;
+                if ($requestedDependencies !== null) {
+                    $this->assertDependencyPayloadTransitionAllowed($requestedDependencies, $data['status']);
+                } else {
+                    $this->assertDependencyStatusTransitionAllowed($currentTask, $data['status']);
+                }
+            }
+        }
+
         $assignments = $data['assignments'] ?? null;
         $dependencies = $data['dependencies'] ?? null;
         unset($data['assignments']);
@@ -550,6 +570,9 @@ class TaskService implements TaskServiceInterface
     {
         if (!in_array($status, self::ALLOWED_STATUSES)) return null;
         $before = $this->getTaskById($id);
+        if ($before instanceof Task) {
+            $this->assertDependencyStatusTransitionAllowed($before, $status);
+        }
         $task = $this->repository->updateTaskStatus($id, $status);
         $this->clearCaches(
             $id,
@@ -652,6 +675,9 @@ class TaskService implements TaskServiceInterface
     public function completeTask($id)
     {
         $before = $this->getTaskById($id);
+        if ($before instanceof Task) {
+            $this->assertDependencyStatusTransitionAllowed($before, 'Done');
+        }
         $task = $this->repository->completeTask($id);
         $this->clearCaches(
             $id,
@@ -694,6 +720,163 @@ class TaskService implements TaskServiceInterface
             $this->syncMilestoneCompletion($task);
         }
         return $task;
+    }
+
+    /**
+     * Enforce dependency rules consistently across all completion/status update paths.
+     *
+     * FE already applies a similar check in the edit form, but backend enforcement is
+     * still required because task completion can also happen from other flows such as
+     * attachment approval and direct status endpoints.
+     */
+    protected function assertDependencyStatusTransitionAllowed(Task $task, string $targetStatus): void
+    {
+        $targetStatus = trim($targetStatus);
+        if (!in_array($targetStatus, ['In Progress', 'Done'], true)) {
+            return;
+        }
+
+        $task->loadMissing('dependencies.dependsOn');
+        $dependencies = collect($task->dependencies ?? []);
+        if ($dependencies->isEmpty()) {
+            return;
+        }
+
+        $unmet = [];
+
+        foreach ($dependencies as $dependency) {
+            $type = strtoupper((string) ($dependency->type ?? 'FS'));
+            $predecessor = $dependency->dependsOn;
+            $predecessorId = (int) ($dependency->depends_on_task_id ?? 0);
+            $predecessorTitle = $predecessor->title ?? ('#'.$predecessorId);
+            $predecessorStatus = trim((string) ($predecessor->status ?? ''));
+
+            $isDone = $predecessorStatus === 'Done';
+            $isStarted = $predecessorStatus !== '' && $predecessorStatus !== 'To Do';
+
+            if ($targetStatus === 'Done') {
+                if (in_array($type, ['FS', 'FF'], true) && !$isDone) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus selesai lebih dulu)';
+                    continue;
+                }
+                if ($type === 'SF' && !$isStarted) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus sudah mulai lebih dulu)';
+                    continue;
+                }
+            }
+
+            if ($targetStatus === 'In Progress') {
+                if ($type === 'FS' && !$isDone) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus selesai lebih dulu)';
+                    continue;
+                }
+                if ($type === 'SS' && !$isStarted) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus sudah mulai lebih dulu)';
+                    continue;
+                }
+            }
+        }
+
+        if (empty($unmet)) {
+            return;
+        }
+
+        $message = 'Tidak bisa mengubah status task karena masih menunggu dependency: '.implode(', ', $unmet);
+
+        throw new HttpResponseException(
+            response()->json([
+                'message' => $message,
+                'errors' => [
+                    'status' => [$message],
+                ],
+            ], 422)
+        );
+    }
+
+    /**
+     * Validate status transition against a dependency payload that will replace
+     * the current dependency set in the same request.
+     *
+     * @param mixed $dependencies
+     */
+    protected function assertDependencyPayloadTransitionAllowed($dependencies, string $targetStatus): void
+    {
+        $targetStatus = trim($targetStatus);
+        if (!in_array($targetStatus, ['In Progress', 'Done'], true)) {
+            return;
+        }
+
+        if (!is_array($dependencies) || empty($dependencies)) {
+            return;
+        }
+
+        $dependsOnIds = collect($dependencies)
+            ->map(fn ($d) => (int) ($d['depends_on_task_id'] ?? 0))
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($dependsOnIds->isEmpty()) {
+            return;
+        }
+
+        $predecessors = Task::query()
+            ->whereIn('id', $dependsOnIds->all())
+            ->get(['id', 'title', 'status'])
+            ->keyBy('id');
+
+        $unmet = [];
+
+        foreach ($dependencies as $dependency) {
+            $dependsOnId = (int) ($dependency['depends_on_task_id'] ?? 0);
+            if ($dependsOnId <= 0) {
+                continue;
+            }
+
+            $type = strtoupper((string) ($dependency['type'] ?? 'FS'));
+            $predecessor = $predecessors->get($dependsOnId);
+            $predecessorTitle = $predecessor?->title ?? ('#'.$dependsOnId);
+            $predecessorStatus = trim((string) ($predecessor?->status ?? ''));
+            $isDone = $predecessorStatus === 'Done';
+            $isStarted = $predecessorStatus !== '' && $predecessorStatus !== 'To Do';
+
+            if ($targetStatus === 'Done') {
+                if (in_array($type, ['FS', 'FF'], true) && !$isDone) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus selesai lebih dulu)';
+                    continue;
+                }
+                if ($type === 'SF' && !$isStarted) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus sudah mulai lebih dulu)';
+                    continue;
+                }
+            }
+
+            if ($targetStatus === 'In Progress') {
+                if ($type === 'FS' && !$isDone) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus selesai lebih dulu)';
+                    continue;
+                }
+                if ($type === 'SS' && !$isStarted) {
+                    $unmet[] = $predecessorTitle.' ('.$type.': harus sudah mulai lebih dulu)';
+                    continue;
+                }
+            }
+        }
+
+        if (empty($unmet)) {
+            return;
+        }
+
+        $message = 'Tidak bisa mengubah status task karena masih menunggu dependency: '.implode(', ', $unmet);
+
+        throw new HttpResponseException(
+            response()->json([
+                'message' => $message,
+                'errors' => [
+                    'status' => [$message],
+                ],
+            ], 422)
+        );
     }
 
     /**

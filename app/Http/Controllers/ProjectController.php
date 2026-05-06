@@ -62,7 +62,36 @@ class ProjectController extends Controller
 
         $projects = $this->service->paginateProjects($filters, $perPage);
 
-        return ProjectResource::collection($projects);
+        return response()->json([
+            'data' => $projects->getCollection()->map(function ($project) {
+                return [
+                    'id' => $project->id,
+                    'name' => $project->name,
+                    'client_name' => $project->client_name,
+                    'value_amount' => (float) $project->value_amount,
+                    'division_owner_id' => $project->division_owner_id,
+                    'division_owner' => $project->divisionOwner
+                        ? [
+                            'id' => $project->divisionOwner->id,
+                            'name' => $project->divisionOwner->name,
+                            'email' => $project->divisionOwner->email,
+                        ]
+                        : null,
+                    'start_planned' => optional($project->start_planned)->format('Y-m-d'),
+                    'end_planned' => optional($project->end_planned)->format('Y-m-d'),
+                    'status' => $project->status,
+                    'created_at' => optional($project->created_at)->toDateTimeString(),
+                ];
+            })->values(),
+            'meta' => [
+                'current_page' => $projects->currentPage(),
+                'last_page' => $projects->lastPage(),
+                'per_page' => $projects->perPage(),
+                'total' => $projects->total(),
+                'from' => $projects->firstItem(),
+                'to' => $projects->lastItem(),
+            ],
+        ]);
     }
 
     /**

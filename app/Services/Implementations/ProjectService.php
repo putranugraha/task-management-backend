@@ -47,7 +47,7 @@ class ProjectService implements ProjectServiceInterface
 
     public function getProjectByName($name)
     {
-        return $this->repository->getProjectByName($name);
+        return $this->repository->getProjectByName($name);  
     }
 
     public function getProjectByClient($clientName)

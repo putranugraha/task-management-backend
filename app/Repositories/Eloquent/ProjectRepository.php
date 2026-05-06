@@ -5,10 +5,13 @@ namespace App\Repositories\Eloquent;
 use App\Models\Project;
 use App\Repositories\Contracts\ProjectRepositoryInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ProjectRepository implements ProjectRepositoryInterface
 {
+    private const STATS_CACHE_TTL_SECONDS = 60;
+
     /** @var Project */
     protected $model;
 
@@ -118,7 +121,19 @@ class ProjectRepository implements ProjectRepositoryInterface
 
     public function paginateProjects(array $filters = [], int $perPage = 20)
     {
-        $query = $this->model->with(['divisionOwner']);
+        $query = $this->model
+            ->select([
+                'id',
+                'name',
+                'client_name',
+                'value_amount',
+                'division_owner_id',
+                'start_planned',
+                'end_planned',
+                'status',
+                'created_at',
+            ])
+            ->with(['divisionOwner:id,name,email']);
 
         // Simple filters
         if (isset($filters['status'])) {
@@ -159,43 +174,56 @@ class ProjectRepository implements ProjectRepositoryInterface
      */
     public function getProjectStatusCounts(array $filters = []): array
     {
-        $baseQuery = $this->model->newQuery();
+        $normalizedFilters = $this->normalizeFilters($filters);
+        $cacheKey = 'projects:status-counts:' . md5(json_encode($normalizedFilters));
 
-        // Simple filters (sama seperti paginateProjects, tanpa eager load)
-        if (isset($filters['status'])) {
-            $baseQuery->where('status', $filters['status']);
-        }
+        return Cache::remember($cacheKey, self::STATS_CACHE_TTL_SECONDS, function () use ($normalizedFilters) {
+            $baseQuery = $this->model->newQuery();
 
-        if (isset($filters['division_owner_id'])) {
-            $baseQuery->where('division_owner_id', $filters['division_owner_id']);
-        }
+            if (isset($normalizedFilters['status'])) {
+                $baseQuery->where('status', $normalizedFilters['status']);
+            }
 
-        if (isset($filters['client_name'])) {
-            $baseQuery->where('client_name', $filters['client_name']);
-        }
+            if (isset($normalizedFilters['division_owner_id'])) {
+                $baseQuery->where('division_owner_id', $normalizedFilters['division_owner_id']);
+            }
 
-        if (!empty($filters['search'])) {
-            $search = mb_strtolower($filters['search']);
-            $baseQuery->where(function ($q) use ($search) {
-                $like = "%{$search}%";
-                $q->whereRaw('LOWER(name) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(client_name) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(status) LIKE ?', [$like]);
-            });
-        }
+            if (isset($normalizedFilters['client_name'])) {
+                $baseQuery->where('client_name', $normalizedFilters['client_name']);
+            }
 
-        $total = (clone $baseQuery)->count();
+            if (!empty($normalizedFilters['search'])) {
+                $search = mb_strtolower($normalizedFilters['search']);
+                $baseQuery->where(function ($q) use ($search) {
+                    $like = "%{$search}%";
+                    $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(client_name) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(status) LIKE ?', [$like]);
+                });
+            }
 
-        $byStatus = (clone $baseQuery)
-            ->selectRaw('status, COUNT(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status')
-            ->toArray();
+            $total = (clone $baseQuery)->count();
 
-        return [
-            'total' => (int) $total,
-            'by_status' => array_map('intval', $byStatus),
-        ];
+            $byStatus = (clone $baseQuery)
+                ->selectRaw('status, COUNT(*) as aggregate')
+                ->groupBy('status')
+                ->pluck('aggregate', 'status')
+                ->toArray();
+
+            return [
+                'total' => (int) $total,
+                'by_status' => array_map('intval', $byStatus),
+            ];
+        });
+    }
+
+    protected function normalizeFilters(array $filters): array
+    {
+        ksort($filters);
+
+        return array_map(function ($value) {
+            return is_string($value) ? trim($value) : $value;
+        }, $filters);
     }
 
     protected function find($id)

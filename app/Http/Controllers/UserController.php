@@ -92,8 +92,14 @@ class UserController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
+        if ((int) $request->user()->id === (int) $id) {
+            return response()->json([
+                'message' => 'Anda tidak dapat menghapus akun yang sedang digunakan.',
+            ], 403);
+        }
+
         $deleted = $this->userService->deleteUser($id);
 
         if (!$deleted) {

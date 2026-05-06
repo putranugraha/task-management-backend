@@ -13,6 +13,8 @@ use Illuminate\Support\Carbon;
 
 class TaskRepository implements TaskRepositoryInterface
 {
+    private const STATS_CACHE_TTL_SECONDS = 60;
+
     /** @var Task */
     protected $model;
 
@@ -200,7 +202,7 @@ class TaskRepository implements TaskRepositoryInterface
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('title', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
                     ->orWhere('priority', 'like', "%{$search}%")
                     ->orWhereHas('project', function ($qp) use ($search) {
@@ -212,7 +214,9 @@ class TaskRepository implements TaskRepositoryInterface
             });
         }
 
-        return $query->paginate($perPage);
+        return $query
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
     }
 
     /**
@@ -223,51 +227,65 @@ class TaskRepository implements TaskRepositoryInterface
      */
     public function getTaskStatusCounts(array $filters = []): array
     {
-        $baseQuery = $this->model->newQuery();
+        $normalizedFilters = $this->normalizeFilters($filters);
+        $cacheKey = 'tasks:status-counts:' . md5(json_encode($normalizedFilters));
 
-        if (isset($filters['project_id'])) {
-            $baseQuery->where('project_id', $filters['project_id']);
-        }
+        return Cache::remember($cacheKey, self::STATS_CACHE_TTL_SECONDS, function () use ($normalizedFilters) {
+            $baseQuery = $this->model->newQuery();
 
-        if (isset($filters['milestone_id'])) {
-            $baseQuery->where('milestone_id', $filters['milestone_id']);
-        }
+            if (isset($normalizedFilters['project_id'])) {
+                $baseQuery->where('project_id', $normalizedFilters['project_id']);
+            }
 
-        if (isset($filters['status'])) {
-            $baseQuery->where('status', $filters['status']);
-        }
+            if (isset($normalizedFilters['milestone_id'])) {
+                $baseQuery->where('milestone_id', $normalizedFilters['milestone_id']);
+            }
 
-        if (isset($filters['priority'])) {
-            $baseQuery->where('priority', $filters['priority']);
-        }
+            if (isset($normalizedFilters['status'])) {
+                $baseQuery->where('status', $normalizedFilters['status']);
+            }
 
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $baseQuery->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('status', 'like', "%{$search}%")
-                    ->orWhere('priority', 'like', "%{$search}%")
-                    ->orWhereHas('project', function ($qp) use ($search) {
-                        $qp->where('name', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('milestone', function ($qm) use ($search) {
-                        $qm->where('name', 'like', "%{$search}%");
-                    });
-            });
-        }
+            if (isset($normalizedFilters['priority'])) {
+                $baseQuery->where('priority', $normalizedFilters['priority']);
+            }
 
-        $total = (clone $baseQuery)->count();
+            if (!empty($normalizedFilters['search'])) {
+                $search = $normalizedFilters['search'];
+                $baseQuery->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhere('priority', 'like', "%{$search}%")
+                        ->orWhereHas('project', function ($qp) use ($search) {
+                            $qp->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('milestone', function ($qm) use ($search) {
+                            $qm->where('name', 'like', "%{$search}%");
+                        });
+                });
+            }
 
-        $byStatus = (clone $baseQuery)
-            ->selectRaw('status, COUNT(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status')
-            ->toArray();
+            $total = (clone $baseQuery)->count();
 
-        return [
-            'total' => (int) $total,
-            'by_status' => array_map('intval', $byStatus),
-        ];
+            $byStatus = (clone $baseQuery)
+                ->selectRaw('status, COUNT(*) as aggregate')
+                ->groupBy('status')
+                ->pluck('aggregate', 'status')
+                ->toArray();
+
+            return [
+                'total' => (int) $total,
+                'by_status' => array_map('intval', $byStatus),
+            ];
+        });
+    }
+
+    protected function normalizeFilters(array $filters): array
+    {
+        ksort($filters);
+
+        return array_map(function ($value) {
+            return is_string($value) ? trim($value) : $value;
+        }, $filters);
     }
 
     protected function find($id)

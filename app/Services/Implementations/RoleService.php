@@ -6,6 +6,7 @@ use App\Services\Contracts\RoleServiceInterface;
 use App\Repositories\Contracts\RoleRepositoryInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\PermissionRegistrar;
 
 class RoleService implements RoleServiceInterface
 {
@@ -293,8 +294,9 @@ class RoleService implements RoleServiceInterface
      */
     public function clearRoleCaches()
     {
-    Cache::forget(self::ROLES_ALL_CACHE_KEY);
-    Cache::forget(self::ROLES_ACTIVE_CACHE_KEY);
-    Cache::forget(self::ROLES_INACTIVE_CACHE_KEY);
+        Cache::forget(self::ROLES_ALL_CACHE_KEY);
+        Cache::forget(self::ROLES_ACTIVE_CACHE_KEY);
+        Cache::forget(self::ROLES_INACTIVE_CACHE_KEY);
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }
