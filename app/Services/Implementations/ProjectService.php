@@ -79,6 +79,11 @@ class ProjectService implements ProjectServiceInterface
         return $this->repository->paginateProjects($filters, $perPage);
     }
 
+    public function getArchivedProjects(array $filters = [], int $perPage = 20)
+    {
+        return $this->repository->getArchivedProjects($filters, $perPage);
+    }
+
     /**
      * Hitung statistik proyek (total, active, completed) berdasarkan filter sederhana.
      *
@@ -217,10 +222,51 @@ class ProjectService implements ProjectServiceInterface
                 $activity->causedBy($actor);
             }
 
-            $activity->log('deleted');
+            $activity->log('archived');
         }
 
         return $result;
+    }
+
+    public function restoreProject($id)
+    {
+        $project = $this->repository->restoreProject($id);
+        $this->clearCaches($id, $project->status ?? null);
+
+        if ($project) {
+            $actor = Auth::user();
+
+            $properties = [
+                'project_id' => $project->id,
+                'name' => $project->name,
+                'client_name' => $project->client_name,
+                'division_owner_id' => $project->division_owner_id,
+                'status' => $project->status,
+                'value_amount' => $project->value_amount,
+            ];
+
+            $activity = activity('projects')
+                ->performedOn($project)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('restored');
+        }
+
+        return $project;
+    }
+
+    public function forceDeleteArchivedProject($id): bool
+    {
+        $deleted = $this->repository->forceDeleteArchivedProject($id);
+        if ($deleted) {
+            $this->clearCaches($id);
+        }
+
+        return $deleted;
     }
 
     public function updateProjectStatus($id, $status)

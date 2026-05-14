@@ -2,10 +2,15 @@
 
 namespace App\Repositories\Eloquent;
 
+use App\Models\Attachment;
+use App\Models\Comment;
+use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Task;
 use App\Repositories\Contracts\ProjectRepositoryInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProjectRepository implements ProjectRepositoryInterface
@@ -106,6 +111,99 @@ class ProjectRepository implements ProjectRepositoryInterface
         }
     }
 
+    public function getArchivedProjects(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model
+            ->onlyTrashed()
+            ->select([
+                'id',
+                'name',
+                'client_name',
+                'value_amount',
+                'division_owner_id',
+                'start_planned',
+                'end_planned',
+                'status',
+                'created_at',
+                'deleted_at',
+            ])
+            ->with(['divisionOwner:id,name,email']);
+
+        $this->applyFilters($query, $filters);
+
+        return $query
+            ->orderByDesc('deleted_at')
+            ->paginate($perPage);
+    }
+
+    public function restoreProject($id)
+    {
+        $project = $this->model->onlyTrashed()->find($id);
+        if (!$project) {
+            return null;
+        }
+
+        try {
+            $project->restore();
+            return $project->fresh(['divisionOwner']);
+        } catch (\Exception $e) {
+            Log::error("Failed to restore project {$id}: {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    public function forceDeleteArchivedProject($id): bool
+    {
+        $project = $this->model->onlyTrashed()->find($id);
+        if (!$project) {
+            return false;
+        }
+
+        try {
+            DB::transaction(function () use ($project) {
+                $taskIds = Task::withTrashed()
+                    ->where('project_id', $project->id)
+                    ->pluck('id');
+
+                $milestoneIds = Milestone::withTrashed()
+                    ->where('project_id', $project->id)
+                    ->pluck('id');
+
+                $this->deletePolymorphicRows(Comment::class, Project::class, [$project->id]);
+                $this->deletePolymorphicRows(Attachment::class, Project::class, [$project->id]);
+
+                if ($milestoneIds->isNotEmpty()) {
+                    $this->deletePolymorphicRows(Comment::class, Milestone::class, $milestoneIds->all());
+                    $this->deletePolymorphicRows(Attachment::class, Milestone::class, $milestoneIds->all());
+                }
+
+                if ($taskIds->isNotEmpty()) {
+                    $this->deletePolymorphicRows(Comment::class, Task::class, $taskIds->all());
+                    $this->deletePolymorphicRows(Attachment::class, Task::class, $taskIds->all());
+                }
+
+                $project->forceDelete();
+            });
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Failed to permanently delete project {$id}: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    private function deletePolymorphicRows(string $modelClass, string $entityClass, array $entityIds): void
+    {
+        if (empty($entityIds)) {
+            return;
+        }
+
+        $modelClass::query()
+            ->whereIn('entity_type', [$entityClass, class_basename($entityClass)])
+            ->whereIn('entity_id', $entityIds)
+            ->delete();
+    }
+
     public function updateProjectStatus($id, $status)
     {
         $project = $this->find($id);
@@ -135,29 +233,7 @@ class ProjectRepository implements ProjectRepositoryInterface
             ])
             ->with(['divisionOwner:id,name,email']);
 
-        // Simple filters
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['division_owner_id'])) {
-            $query->where('division_owner_id', $filters['division_owner_id']);
-        }
-
-        if (isset($filters['client_name'])) {
-            $query->where('client_name', $filters['client_name']);
-        }
-
-        // Free-text search across common columns (case-insensitive)
-        if (!empty($filters['search'])) {
-            $search = mb_strtolower($filters['search']);
-            $query->where(function ($q) use ($search) {
-                $like = "%{$search}%";
-                $q->whereRaw('LOWER(name) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(client_name) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(status) LIKE ?', [$like]);
-            });
-        }
+        $this->applyFilters($query, $filters);
 
         // Show newest projects first so recent creations
         // (e.g. id 36) appear on the first page.
@@ -224,6 +300,31 @@ class ProjectRepository implements ProjectRepositoryInterface
         return array_map(function ($value) {
             return is_string($value) ? trim($value) : $value;
         }, $filters);
+    }
+
+    protected function applyFilters($query, array $filters): void
+    {
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['division_owner_id'])) {
+            $query->where('division_owner_id', $filters['division_owner_id']);
+        }
+
+        if (isset($filters['client_name'])) {
+            $query->where('client_name', $filters['client_name']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = mb_strtolower($filters['search']);
+            $query->where(function ($q) use ($search) {
+                $like = "%{$search}%";
+                $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(client_name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(status) LIKE ?', [$like]);
+            });
+        }
     }
 
     protected function find($id)

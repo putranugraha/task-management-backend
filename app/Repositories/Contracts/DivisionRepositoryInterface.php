@@ -36,6 +36,14 @@ interface DivisionRepositoryInterface
     public function getDivisionByName($name);
 
     /**
+     * Ambil divisi berdasarkan status.
+     *
+     * @param string $status
+     * @return mixed
+     */
+    public function getDivisionByStatus($status);
+
+    /**
      * Membuat divisi baru.
      *
      * @param array $data
@@ -59,6 +67,15 @@ interface DivisionRepositoryInterface
      * @return mixed
      */
     public function deleteDivision($id);
+
+    /**
+     * Update status divisi berdasarkan ID.
+     *
+     * @param int $id
+     * @param string $status
+     * @return mixed
+     */
+    public function updateDivisionStatus($id, $status);
 
     /**
      * Hitung jumlah user dalam divisi tertentu.

@@ -20,6 +20,8 @@ interface MilestoneServiceInterface
     public function updateMilestone($id, array $data);
     /** Delete milestone. */
     public function deleteMilestone($id);
+    public function getArchivedMilestones(array $filters = [], int $perPage = 20);
+    public function restoreMilestone($id);
     /** Update status milestone. */
     public function updateMilestoneStatus($id, $status);
     /** Complete milestone (auto due_actual = today). */

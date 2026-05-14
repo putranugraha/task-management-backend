@@ -75,6 +75,20 @@ class MilestoneController extends Controller
         return response()->json($stats);
     }
 
+    public function archived(Request $request)
+    {
+        $filters = $this->milestoneFiltersFromRequest($request);
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $milestones = $this->service->getArchivedMilestones($filters, $perPage);
+
+        return MilestoneResource::collection($milestones);
+    }
+
     public function store(MilestoneStoreRequest $request)
     {
         $ms = $this->service->createMilestone($request->validated());
@@ -120,7 +134,14 @@ class MilestoneController extends Controller
     {
         $deleted = $this->service->deleteMilestone($id);
         if (!$deleted) return response()->json(['message' => 'Milestone tidak ditemukan'], 404);
-        return response()->json(['message' => 'Milestone berhasil dihapus']);
+        return response()->json(['message' => 'Milestone berhasil di-archive']);
+    }
+
+    public function restore(string $id)
+    {
+        $ms = $this->service->restoreMilestone($id);
+        if (!$ms) return response()->json(['message' => 'Milestone archive tidak ditemukan'], 404);
+        return new MilestoneResource($ms);
     }
 
     public function updateStatus(string $id, Request $request)
@@ -138,5 +159,16 @@ class MilestoneController extends Controller
         $ms = $this->service->completeMilestone($id);
         if (!$ms) return response()->json(['message' => 'Milestone tidak ditemukan'], 404);
         return new MilestoneResource($ms);
+    }
+
+    protected function milestoneFiltersFromRequest(Request $request): array
+    {
+        $filters = [
+            'project_id' => $request->query('project_id'),
+            'status' => $request->query('status'),
+            'search' => $request->query('search'),
+        ];
+
+        return array_filter($filters, fn ($value) => $value !== null && $value !== '');
     }
 }

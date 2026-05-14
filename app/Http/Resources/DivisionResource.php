@@ -14,6 +14,7 @@ class DivisionResource extends JsonResource
             'code' => $this->code,
             'name' => $this->name,
             'description' => $this->description,
+            'status' => $this->status ?? 'Aktif',
             'users' => $this->whenLoaded('users', function () {
                 return UserResource::collection($this->users);
             }),

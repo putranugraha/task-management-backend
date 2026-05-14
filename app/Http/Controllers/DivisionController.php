@@ -21,6 +21,7 @@ class DivisionController extends Controller
     {
         $code = $request->query('code');
         $name = $request->query('name');
+        $status = $request->query('status');
         $withUsersCount = $request->boolean('with_users_count');
         $withUsers = $request->boolean('with_users');
 
@@ -54,7 +55,15 @@ class DivisionController extends Controller
             return DivisionResource::collection(collect([$division]));
         }
 
-        $divisions = $this->service->getAllDivisions();
+        if ($status === null || $status === 'all') {
+            $divisions = $this->service->getAllDivisions();
+        } elseif ($status == 1 || $status === 'Aktif') {
+            $divisions = $this->service->getActiveDivisions();
+        } elseif ($status == 0 || $status === 'Non Aktif') {
+            $divisions = $this->service->getInactiveDivisions();
+        } else {
+            return response()->json(['error' => 'Invalid status parameter'], 400);
+        }
         if ($withUsers && method_exists($divisions, 'load')) {
             $divisions->load('users');
         }
@@ -108,11 +117,35 @@ class DivisionController extends Controller
 
     public function destroy(string $id)
     {
-        $deleted = $this->service->deleteDivision($id);
-        if (!$deleted) {
+        $deactivated = $this->service->deleteDivision($id);
+        if (!$deactivated) {
             return response()->json(['message' => 'Division tidak ditemukan'], 404);
         }
-        return response()->json(['message' => 'Division berhasil dihapus']);
+        return response()->json(['message' => 'Division berhasil dinonaktifkan']);
+    }
+
+    public function updateStatus(string $id, Request $request)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:Aktif,Non Aktif',
+        ]);
+
+        $division = $this->service->updateDivisionStatus($id, $validated['status']);
+        if (!$division) {
+            return response()->json(['message' => 'Division tidak ditemukan'], 404);
+        }
+
+        return new DivisionResource($division);
+    }
+
+    public function activate(string $id)
+    {
+        $division = $this->service->updateDivisionStatus($id, 'Aktif');
+        if (!$division) {
+            return response()->json(['message' => 'Division tidak ditemukan'], 404);
+        }
+
+        return new DivisionResource($division);
     }
 
     public function usersCount(string $divisionId)

@@ -63,26 +63,7 @@ class ProjectController extends Controller
         $projects = $this->service->paginateProjects($filters, $perPage);
 
         return response()->json([
-            'data' => $projects->getCollection()->map(function ($project) {
-                return [
-                    'id' => $project->id,
-                    'name' => $project->name,
-                    'client_name' => $project->client_name,
-                    'value_amount' => (float) $project->value_amount,
-                    'division_owner_id' => $project->division_owner_id,
-                    'division_owner' => $project->divisionOwner
-                        ? [
-                            'id' => $project->divisionOwner->id,
-                            'name' => $project->divisionOwner->name,
-                            'email' => $project->divisionOwner->email,
-                        ]
-                        : null,
-                    'start_planned' => optional($project->start_planned)->format('Y-m-d'),
-                    'end_planned' => optional($project->end_planned)->format('Y-m-d'),
-                    'status' => $project->status,
-                    'created_at' => optional($project->created_at)->toDateTimeString(),
-                ];
-            })->values(),
+            'data' => $projects->getCollection()->map(fn ($project) => $this->projectPayload($project))->values(),
             'meta' => [
                 'current_page' => $projects->currentPage(),
                 'last_page' => $projects->lastPage(),
@@ -119,6 +100,29 @@ class ProjectController extends Controller
         $stats = $this->service->getProjectStats($filters);
 
         return response()->json($stats);
+    }
+
+    public function archived(Request $request)
+    {
+        $filters = $this->projectFiltersFromRequest($request);
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $projects = $this->service->getArchivedProjects($filters, $perPage);
+
+        return response()->json([
+            'data' => $projects->getCollection()->map(fn ($project) => $this->projectPayload($project))->values(),
+            'meta' => [
+                'current_page' => $projects->currentPage(),
+                'last_page' => $projects->lastPage(),
+                'per_page' => $projects->perPage(),
+                'total' => $projects->total(),
+                'from' => $projects->firstItem(),
+                'to' => $projects->lastItem(),
+            ],
+        ]);
     }
 
     public function byName(Request $request)
@@ -194,7 +198,28 @@ class ProjectController extends Controller
         if (!$deleted) {
             return response()->json(['message' => 'Project tidak ditemukan'], 404);
         }
-        return response()->json(['message' => 'Project berhasil dihapus']);
+        return response()->json(['message' => 'Project berhasil di-archive']);
+    }
+
+    public function restore(string $id)
+    {
+        $project = $this->service->restoreProject($id);
+        if (!$project) {
+            return response()->json(['message' => 'Project archive tidak ditemukan'], 404);
+        }
+        return new ProjectResource($project);
+    }
+
+    public function forceDelete(string $id)
+    {
+        $deleted = $this->service->forceDeleteArchivedProject($id);
+        if (!$deleted) {
+            return response()->json(['message' => 'Project archive tidak ditemukan atau gagal dihapus permanen'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Project berhasil dihapus permanen beserta milestone, task, progress, biaya, baseline, komentar, dan attachment terkait.',
+        ]);
     }
 
     public function updateStatus(string $id, Request $request)
@@ -207,5 +232,40 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Gagal update status atau project tidak ditemukan'], 400);
         }
         return new ProjectResource($project);
+    }
+
+    protected function projectFiltersFromRequest(Request $request): array
+    {
+        $filters = [
+            'status' => $request->query('status'),
+            'division_owner_id' => $request->query('division_id'),
+            'client_name' => $request->query('client_name'),
+            'search' => $request->query('search'),
+        ];
+
+        return array_filter($filters, fn ($value) => $value !== null && $value !== '');
+    }
+
+    protected function projectPayload($project): array
+    {
+        return [
+            'id' => $project->id,
+            'name' => $project->name,
+            'client_name' => $project->client_name,
+            'value_amount' => (float) $project->value_amount,
+            'division_owner_id' => $project->division_owner_id,
+            'division_owner' => $project->divisionOwner
+                ? [
+                    'id' => $project->divisionOwner->id,
+                    'name' => $project->divisionOwner->name,
+                    'email' => $project->divisionOwner->email,
+                ]
+                : null,
+            'start_planned' => optional($project->start_planned)->format('Y-m-d'),
+            'end_planned' => optional($project->end_planned)->format('Y-m-d'),
+            'status' => $project->status,
+            'created_at' => optional($project->created_at)->toDateTimeString(),
+            'deleted_at' => optional($project->deleted_at)->toDateTimeString(),
+        ];
     }
 }

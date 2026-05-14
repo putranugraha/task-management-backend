@@ -33,6 +33,8 @@ interface TaskRepositoryInterface
 
     /** Hapus task berdasarkan ID. */
     public function deleteTask($id);
+    public function getArchivedTasks(array $filters = [], int $perPage = 20);
+    public function restoreTask($id);
 
     /** Update status task (misalnya To Do → In Progress → Done). */
     public function updateTaskStatus($id, $status);

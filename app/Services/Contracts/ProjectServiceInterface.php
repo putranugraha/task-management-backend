@@ -84,6 +84,9 @@ interface ProjectServiceInterface
      * @return mixed
      */
     public function deleteProject($id);
+    public function getArchivedProjects(array $filters = [], int $perPage = 20);
+    public function restoreProject($id);
+    public function forceDeleteArchivedProject($id): bool;
 
     /**
      * Update status proyek.

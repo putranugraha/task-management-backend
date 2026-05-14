@@ -134,6 +134,20 @@ class TaskController extends Controller
         return response()->json($stats);
     }
 
+    public function archived(Request $request)
+    {
+        $filters = $this->taskFiltersFromRequest($request);
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $tasks = $this->service->getArchivedTasks($filters, $perPage);
+
+        return TaskResource::collection($tasks);
+    }
+
     public function store(TaskStoreRequest $request)
     {
         $task = $this->service->createTask($request->validated());
@@ -225,7 +239,14 @@ class TaskController extends Controller
     {
         $deleted = $this->service->deleteTask($id);
         if (!$deleted) return response()->json(['message' => 'Task tidak ditemukan'], 404);
-        return response()->json(['message' => 'Task berhasil dihapus']);
+        return response()->json(['message' => 'Task berhasil di-archive']);
+    }
+
+    public function restore(string $id)
+    {
+        $task = $this->service->restoreTask($id);
+        if (!$task) return response()->json(['message' => 'Task archive tidak ditemukan'], 404);
+        return new TaskResource($task);
     }
 
     public function updateStatus(string $id, Request $request)
@@ -300,5 +321,18 @@ class TaskController extends Controller
             $res->headers->set('X-Debug-Env', (string) config('app.env'));
         }
         return $res;
+    }
+
+    protected function taskFiltersFromRequest(Request $request): array
+    {
+        $filters = [
+            'project_id' => $request->query('project_id'),
+            'milestone_id' => $request->query('milestone_id'),
+            'status' => $request->query('status'),
+            'priority' => $request->query('priority'),
+            'search' => $request->query('search'),
+        ];
+
+        return array_filter($filters, fn($value) => $value !== null && $value !== '');
     }
 }

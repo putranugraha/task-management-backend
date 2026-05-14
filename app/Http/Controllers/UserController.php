@@ -96,16 +96,16 @@ class UserController extends Controller
     {
         if ((int) $request->user()->id === (int) $id) {
             return response()->json([
-                'message' => 'Anda tidak dapat menghapus akun yang sedang digunakan.',
+                'message' => 'Anda tidak dapat menonaktifkan akun yang sedang digunakan.',
             ], 403);
         }
 
-        $deleted = $this->userService->deleteUser($id);
+        $deactivated = $this->userService->deleteUser($id);
 
-        if (!$deleted) {
+        if (!$deactivated) {
             return response()->json(['message' => 'User tidak ditemukan'], 404);
         }
-        return response()->json(['message' => 'User berhasil dihapus']);
+        return response()->json(['message' => 'User berhasil dinonaktifkan']);
     }
 
     /**
@@ -113,15 +113,29 @@ class UserController extends Controller
      */
     public function updateStatus(string $id, Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'required|in:Aktif,Non Aktif',
         ]);
 
-        $user = $this->userService->updateUserStatus($id, $request->validated());
+        $user = $this->userService->updateUserStatus($id, $validated['status']);
 
         if (!$user) {
             return response()->json(['message' => 'Failed to update user status'], 404);
         }
+        return new UserResource($user);
+    }
+
+    /**
+     * Activate user account.
+     */
+    public function activate(string $id)
+    {
+        $user = $this->userService->updateUserStatus($id, 'Aktif');
+
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan'], 404);
+        }
+
         return new UserResource($user);
     }
 

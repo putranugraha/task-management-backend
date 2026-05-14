@@ -16,6 +16,7 @@ class DivisionService implements DivisionServiceInterface
     const CACHE_ID_PREFIX = 'division.'; // + id
     const CACHE_CODE_PREFIX = 'division.code.'; // + code
     const CACHE_NAME_PREFIX = 'division.name.'; // + name
+    const CACHE_STATUS_PREFIX = 'divisions.status.'; // + status
     const CACHE_COUNT_PREFIX = 'division.count.'; // + divisionId
     const CACHE_DURATION = 1800; // 30 minutes
 
@@ -44,11 +45,31 @@ class DivisionService implements DivisionServiceInterface
         return Cache::remember(self::CACHE_NAME_PREFIX.$name, self::CACHE_DURATION, fn () => $this->repository->getDivisionByName($name));
     }
 
+    public function getDivisionByStatus($status)
+    {
+        if (!in_array($status, ['Aktif', 'Non Aktif'], true)) {
+            return collect();
+        }
+
+        return Cache::remember(self::CACHE_STATUS_PREFIX.$status, self::CACHE_DURATION, fn () => $this->repository->getDivisionByStatus($status));
+    }
+
+    public function getActiveDivisions()
+    {
+        return $this->getDivisionByStatus('Aktif');
+    }
+
+    public function getInactiveDivisions()
+    {
+        return $this->getDivisionByStatus('Non Aktif');
+    }
+
     public function createDivision(array $data)
     {
         // Auto-generate numeric codes (01, 02, 03, ...) to keep Division codes simple and consistent.
         // Code is still unique at the DB level; we retry a few times in case of race collisions.
         $data['code'] = $this->generateNextNumericCode();
+        $data['status'] = $data['status'] ?? 'Aktif';
 
         $division = null;
         for ($attempt = 0; $attempt < 5; $attempt++) {
@@ -69,6 +90,7 @@ class DivisionService implements DivisionServiceInterface
                 'code' => $division->code,
                 'name' => $division->name,
                 'description' => $division->description,
+                'status' => $division->status ?? 'Aktif',
             ];
 
             $activity = activity('divisions')
@@ -101,6 +123,8 @@ class DivisionService implements DivisionServiceInterface
                 'name_after' => $division->name,
                 'description_before' => $before->description ?? null,
                 'description_after' => $division->description,
+                'status_before' => $before->status ?? null,
+                'status_after' => $division->status ?? null,
             ];
 
             $activity = activity('divisions')
@@ -118,33 +142,68 @@ class DivisionService implements DivisionServiceInterface
 
     public function deleteDivision($id)
     {
-        $division = $this->getDivisionById($id);
-        $result = $this->repository->deleteDivision($id);
-        if ($result) {
-            $this->clearCaches($id, $division->code ?? null, $division->name ?? null);
+        $before = $this->getDivisionById($id);
+        $division = $this->repository->updateDivisionStatus($id, 'Non Aktif');
+        if ($division) {
+            $this->clearCaches($id, $division->code ?? null, $division->name ?? null, $before->status ?? null);
+            $this->clearCaches($id, $division->code ?? null, $division->name ?? null, $division->status ?? null);
 
-            if ($division) {
-                $actor = Auth::user();
+            $actor = Auth::user();
 
-                $properties = [
+            $properties = [
+                'division_id' => $division->id,
+                'code' => $division->code,
+                'name' => $division->name,
+                'description' => $division->description,
+                'status_before' => $before->status ?? null,
+                'status_after' => $division->status ?? null,
+            ];
+
+            $activity = activity('divisions')
+                ->performedOn($division instanceof Division ? $division : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('deactivated');
+        }
+        return (bool) $division;
+    }
+
+    public function updateDivisionStatus($id, $status)
+    {
+        if (!in_array($status, ['Aktif', 'Non Aktif'], true)) {
+            return null;
+        }
+
+        $before = $this->getDivisionById($id);
+        $division = $this->repository->updateDivisionStatus($id, $status);
+        if ($division) {
+            $this->clearCaches($id, $division->code, $division->name, $before->status ?? null);
+            $this->clearCaches($id, $division->code, $division->name, $division->status ?? null);
+
+            $actor = Auth::user();
+
+            $activity = activity('divisions')
+                ->performedOn($division instanceof Division ? $division : null)
+                ->withProperties([
                     'division_id' => $division->id,
                     'code' => $division->code,
                     'name' => $division->name,
-                    'description' => $division->description,
-                ];
+                    'status_before' => $before->status ?? null,
+                    'status_after' => $division->status ?? null,
+                ]);
 
-                $activity = activity('divisions')
-                    ->performedOn($division instanceof Division ? $division : null)
-                    ->withProperties($properties);
-
-                if ($actor) {
-                    $activity->causedBy($actor);
-                }
-
-                $activity->log('deleted');
+            if ($actor) {
+                $activity->causedBy($actor);
             }
+
+            $activity->log('status_changed');
         }
-        return $result;
+
+        return $division;
     }
 
     public function countUsersInDivision($divisionId)
@@ -156,9 +215,14 @@ class DivisionService implements DivisionServiceInterface
         return Cache::remember(self::CACHE_COUNT_PREFIX.$divisionId, self::CACHE_DURATION, fn () => $this->repository->countUsersInDivision($divisionId));
     }
 
-    protected function clearCaches($id = null, $code = null, $name = null): void
+    protected function clearCaches($id = null, $code = null, $name = null, $status = null): void
     {
         Cache::forget(self::CACHE_ALL);
+        Cache::forget(self::CACHE_STATUS_PREFIX.'Aktif');
+        Cache::forget(self::CACHE_STATUS_PREFIX.'Non Aktif');
+        if ($status) {
+            Cache::forget(self::CACHE_STATUS_PREFIX.$status);
+        }
         if ($id) {
             Cache::forget(self::CACHE_ID_PREFIX.$id);
             Cache::forget(self::CACHE_COUNT_PREFIX.$id);

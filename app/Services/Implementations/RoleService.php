@@ -210,21 +210,21 @@ class RoleService implements RoleServiceInterface
      */
     public function deleteRole($id)
     {
-        $role = $this->roleRepository->getRoleById($id);
+        $before = $this->roleRepository->getRoleById($id);
 
-        // Menghapus role
-        $result = $this->roleRepository->deleteRole($id);
+        $role = $this->roleRepository->updateRoleStatus($id, 'Non Aktif');
 
         // Clear cache
         $this->clearRoleCaches();
 
-        if ($result && $role) {
+        if ($role) {
             $actor = Auth::user();
 
             $properties = [
                 'role_id' => $role->id,
                 'name' => $role->name,
-                'status' => $role->status ?? null,
+                'status_before' => $before->status ?? null,
+                'status_after' => $role->status ?? null,
                 'permissions' => method_exists($role, 'permissions') ? $role->permissions->pluck('name')->toArray() : [],
             ];
 
@@ -236,10 +236,10 @@ class RoleService implements RoleServiceInterface
                 $activity->causedBy($actor);
             }
 
-            $activity->log('deleted');
+            $activity->log('deactivated');
         }
 
-        return $result;
+        return (bool) $role;
     }
 
     /**

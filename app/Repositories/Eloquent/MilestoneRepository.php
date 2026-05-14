@@ -93,6 +93,33 @@ class MilestoneRepository implements MilestoneRepositoryInterface
         }
     }
 
+    public function getArchivedMilestones(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model
+            ->onlyTrashed()
+            ->with('project');
+
+        $this->applyFilters($query, $filters);
+
+        return $query
+            ->orderByDesc('deleted_at')
+            ->paginate($perPage);
+    }
+
+    public function restoreMilestone($id)
+    {
+        $milestone = $this->model->onlyTrashed()->find($id);
+        if (!$milestone) return null;
+
+        try {
+            $milestone->restore();
+            return $milestone->fresh('project');
+        } catch (\Exception $e) {
+            Log::error("Failed to restore milestone {$id}: {$e->getMessage()}");
+            return null;
+        }
+    }
+
     public function updateMilestoneStatus($id, $status)
     {
         $milestone = $this->find($id);
@@ -131,25 +158,7 @@ class MilestoneRepository implements MilestoneRepositoryInterface
     {
         $query = $this->model->with('project');
 
-        if (isset($filters['project_id'])) {
-            $query->where('project_id', $filters['project_id']);
-        }
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        // Free-text search across milestone + project fields
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('status', 'like', "%{$search}%")
-                    ->orWhereHas('project', function ($qp) use ($search) {
-                        $qp->where('name', 'like', "%{$search}%");
-                    });
-            });
-        }
+        $this->applyFilters($query, $filters);
 
         return $query->paginate($perPage);
     }
@@ -204,6 +213,28 @@ class MilestoneRepository implements MilestoneRepositoryInterface
         } catch (ModelNotFoundException $e) {
             Log::error("Milestone with ID {$id} not found.");
             return null;
+        }
+    }
+
+    protected function applyFilters($query, array $filters): void
+    {
+        if (isset($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($qp) use ($search) {
+                        $qp->where('name', 'like', "%{$search}%");
+                    });
+            });
         }
     }
 

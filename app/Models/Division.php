@@ -18,6 +18,7 @@ class Division extends Model
         'code',
         'name',
         'description',
+        'status',
     ];
 
     public function users()

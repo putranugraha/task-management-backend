@@ -119,18 +119,7 @@ class RoleRepository implements RoleRepositoryInterface
      */
     public function deleteRole($id)
     {
-        $role = $this->findRole($id);
-
-        if ($role) {
-            try {
-                $role->delete();
-                return true;
-            } catch (\Exception $e) {
-                Log::error("Failed to delete role with ID {$id}: {$e->getMessage()}");
-                return false;
-            }
-        }
-        return false;
+        return (bool) $this->updateRoleStatus($id, 'Non Aktif');
     }
 
     /**

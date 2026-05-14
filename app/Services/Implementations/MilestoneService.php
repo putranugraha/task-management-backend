@@ -60,6 +60,11 @@ class MilestoneService implements MilestoneServiceInterface
         return $this->repository->paginateMilestones($filters, $perPage);
     }
 
+    public function getArchivedMilestones(array $filters = [], int $perPage = 20)
+    {
+        return $this->repository->getArchivedMilestones($filters, $perPage);
+    }
+
     /**
      * Hitung statistik milestone (total, completed, overdue) berdasarkan filter sederhana.
      *
@@ -193,10 +198,41 @@ class MilestoneService implements MilestoneServiceInterface
                 $activity->causedBy($actor);
             }
 
-            $activity->log('deleted');
+            $activity->log('archived');
         }
 
         return $result;
+    }
+
+    public function restoreMilestone($id)
+    {
+        $ms = $this->repository->restoreMilestone($id);
+        $this->clearCaches($ms->project_id ?? null, $ms->status ?? null, $id);
+
+        if ($ms) {
+            $actor = Auth::user();
+
+            $properties = [
+                'milestone_id' => $ms->id,
+                'project_id' => $ms->project_id,
+                'name' => $ms->name,
+                'due_planned' => $ms->due_planned,
+                'due_actual' => $ms->due_actual,
+                'status' => $ms->status,
+            ];
+
+            $activity = activity('milestones')
+                ->performedOn($ms)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('restored');
+        }
+
+        return $ms;
     }
 
     public function updateMilestoneStatus($id, $status)

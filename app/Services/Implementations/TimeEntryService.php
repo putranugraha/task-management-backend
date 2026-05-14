@@ -3,6 +3,7 @@
 namespace App\Services\Implementations;
 
 use App\Repositories\Contracts\TimeEntryRepositoryInterface;
+use App\Services\Contracts\TaskServiceInterface;
 use App\Services\Contracts\TimeEntryServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,7 @@ use Illuminate\Support\Carbon;
 class TimeEntryService implements TimeEntryServiceInterface
 {
     protected TimeEntryRepositoryInterface $repository;
+    protected TaskServiceInterface $taskService;
 
     const CACHE_ALL = 'time_entries.all';
     const CACHE_ID_PREFIX = 'time_entry.'; // + id
@@ -23,9 +25,10 @@ class TimeEntryService implements TimeEntryServiceInterface
     const CACHE_TOTAL_USER_PREFIX = 'time_entries.total.user.'; // + userId
     const CACHE_DURATION = 900; // 15 minutes
 
-    public function __construct(TimeEntryRepositoryInterface $repository)
+    public function __construct(TimeEntryRepositoryInterface $repository, TaskServiceInterface $taskService)
     {
         $this->repository = $repository;
+        $this->taskService = $taskService;
     }
 
     public function getAllTimeEntries()
@@ -68,11 +71,11 @@ class TimeEntryService implements TimeEntryServiceInterface
     public function createTimeEntry(array $data)
     {
         $data = $this->appendProgressToNote($data);
+        if (isset($data['task_id'], $data['date'])) {
+            $this->prepareTaskForTimeEntry((int) $data['task_id'], (string) $data['date']);
+        }
         $row = $this->repository->createTimeEntry($data);
         $this->clearCaches($row->id ?? null, $row->task_id ?? null, $row->user_id ?? null);
-        if ($row) {
-            $this->markTaskStartedFromTimeEntry((int) $row->task_id, (string) $row->date);
-        }
 
         if ($row) {
             $actor = Auth::user();
@@ -113,6 +116,8 @@ class TimeEntryService implements TimeEntryServiceInterface
         $hours = $data['hours'];
         $note = ($this->appendProgressToNote($data)['note'] ?? ($data['note'] ?? null));
 
+        $this->prepareTaskForTimeEntry((int) $taskId, (string) $date);
+
         $before = TimeEntry::where('task_id', $taskId)
             ->where('user_id', $userId)
             ->where('date', $date)
@@ -131,9 +136,6 @@ class TimeEntryService implements TimeEntryServiceInterface
         );
 
         $this->clearCaches($row->id ?? null, $taskId, $userId);
-        if ($row) {
-            $this->markTaskStartedFromTimeEntry((int) $taskId, (string) $date);
-        }
 
         if ($row) {
             $actor = Auth::user();
@@ -298,7 +300,7 @@ class TimeEntryService implements TimeEntryServiceInterface
         return $data;
     }
 
-    protected function markTaskStartedFromTimeEntry(int $taskId, string $entryDate): void
+    protected function prepareTaskForTimeEntry(int $taskId, string $entryDate): void
     {
         $task = Task::find($taskId);
         if (!$task) {
@@ -309,8 +311,8 @@ class TimeEntryService implements TimeEntryServiceInterface
         $dirty = false;
 
         if (!in_array($task->status, $terminal, true) && $task->status !== 'In Progress') {
-            $task->status = 'In Progress';
-            $dirty = true;
+            $this->taskService->updateTaskStatus($taskId, 'In Progress');
+            $task->refresh();
         }
 
         if ($entryDate) {

@@ -96,15 +96,21 @@ class RoleController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
-        $deleted = $this->roleService->deleteRole($id);
+        if ($this->roleIsAssignedToCurrentUser($request, $id)) {
+            return response()->json([
+                'message' => 'Anda tidak dapat menonaktifkan role yang sedang digunakan akun Anda.',
+            ], 403);
+        }
 
-        if (!$deleted) {
+        $deactivated = $this->roleService->deleteRole($id);
+
+        if (!$deactivated) {
             return response()->json(['message' => 'Role tidak ditemukan'], 404);
         }
 
-        return response()->json(['message' => 'Role berhasil dihapus'], 200);
+        return response()->json(['message' => 'Role berhasil dinonaktifkan'], 200);
     }
 
     /**
@@ -112,15 +118,48 @@ class RoleController extends Controller
      */
     public function updateStatus(string $id, Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'required|in:Aktif,Non Aktif',
         ]);
 
-        $role = $this->roleService->updateRoleStatus($id, $request->validated());
+        if ($validated['status'] === 'Non Aktif' && $this->roleIsAssignedToCurrentUser($request, $id)) {
+            return response()->json([
+                'message' => 'Anda tidak dapat menonaktifkan role yang sedang digunakan akun Anda.',
+            ], 403);
+        }
+
+        $role = $this->roleService->updateRoleStatus($id, $validated['status']);
 
         if (!$role) {
             return response()->json(['message' => 'Failed to update role status'], 404);
         }
         return new RoleResource($role);
+    }
+
+    /**
+     * Activate role.
+     */
+    public function activate(string $id)
+    {
+        $role = $this->roleService->updateRoleStatus($id, 'Aktif');
+
+        if (!$role) {
+            return response()->json(['message' => 'Role tidak ditemukan'], 404);
+        }
+
+        return new RoleResource($role);
+    }
+
+    protected function roleIsAssignedToCurrentUser(Request $request, string $id): bool
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        $user->loadMissing('roles');
+
+        return $user->roles->contains(fn ($role) => (int) $role->id === (int) $id);
     }
 }

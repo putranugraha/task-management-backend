@@ -226,37 +226,37 @@ class UserService implements UserServiceInterface
 
     public function deleteUser($id)
     {
-        $user = $this->userRepository->getUserById($id);
-        $result = $this->userRepository->deleteUser($id);
+        $before = $this->userRepository->getUserById($id);
+        $user = $this->userRepository->updateUserStatus($id, 'Non Aktif');
 
-        if ($result) {
+        if ($user) {
             $this->clearUserCaches($id);
 
-            if ($user) {
-                $actor = Auth::user();
+            $actor = Auth::user();
 
-                $properties = [
-                    'user_id' => $user->id,
-                    'email' => $user->email,
-                    'division_id' => $user->division_id,
-                    'status' => $user->status,
-                    'is_active' => $user->is_active,
-                    'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames()->toArray() : [],
-                ];
+            $properties = [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'division_id' => $user->division_id,
+                'status_before' => $before->status ?? null,
+                'status_after' => $user->status,
+                'is_active_before' => $before->is_active ?? null,
+                'is_active_after' => $user->is_active,
+                'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames()->toArray() : [],
+            ];
 
-                $activity = activity('users')
-                    ->performedOn($user)
-                    ->withProperties($properties);
+            $activity = activity('users')
+                ->performedOn($user)
+                ->withProperties($properties);
 
-                if ($actor) {
-                    $activity->causedBy($actor);
-                }
-
-                $activity->log('deleted');
+            if ($actor) {
+                $activity->causedBy($actor);
             }
+
+            $activity->log('deactivated');
         }
 
-        return $result;
+        return (bool) $user;
     }
 
     public function updateUserStatus($id, $status)

@@ -129,6 +129,33 @@ class TaskRepository implements TaskRepositoryInterface
         }
     }
 
+    public function getArchivedTasks(array $filters = [], int $perPage = 20)
+    {
+        $query = $this->model
+            ->onlyTrashed()
+            ->with(['project', 'milestone']);
+
+        $this->applyFilters($query, $filters);
+
+        return $query
+            ->orderByDesc('deleted_at')
+            ->paginate($perPage);
+    }
+
+    public function restoreTask($id)
+    {
+        $task = $this->model->onlyTrashed()->find($id);
+        if (!$task) return null;
+
+        try {
+            $task->restore();
+            return $task->fresh(['project', 'milestone']);
+        } catch (\Exception $e) {
+            Log::error("Failed to restore task {$id}: {$e->getMessage()}");
+            return null;
+        }
+    }
+
     public function updateTaskStatus($id, $status)
     {
         $task = $this->find($id);
@@ -182,37 +209,7 @@ class TaskRepository implements TaskRepositoryInterface
     {
         $query = $this->model->with(['project', 'milestone']);
 
-        if (isset($filters['project_id'])) {
-            $query->where('project_id', $filters['project_id']);
-        }
-
-        if (isset($filters['milestone_id'])) {
-            $query->where('milestone_id', $filters['milestone_id']);
-        }
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['priority'])) {
-            $query->where('priority', $filters['priority']);
-        }
-
-        // Free-text search across task + related project/milestone
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('status', 'like', "%{$search}%")
-                    ->orWhere('priority', 'like', "%{$search}%")
-                    ->orWhereHas('project', function ($qp) use ($search) {
-                        $qp->where('name', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('milestone', function ($qm) use ($search) {
-                        $qm->where('name', 'like', "%{$search}%");
-                    });
-            });
-        }
+        $this->applyFilters($query, $filters);
 
         return $query
             ->orderByDesc('created_at')
@@ -286,6 +283,40 @@ class TaskRepository implements TaskRepositoryInterface
         return array_map(function ($value) {
             return is_string($value) ? trim($value) : $value;
         }, $filters);
+    }
+
+    protected function applyFilters($query, array $filters): void
+    {
+        if (isset($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['milestone_id'])) {
+            $query->where('milestone_id', $filters['milestone_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['priority'])) {
+            $query->where('priority', $filters['priority']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('priority', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($qp) use ($search) {
+                        $qp->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('milestone', function ($qm) use ($search) {
+                        $qm->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
     }
 
     protected function find($id)

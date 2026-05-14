@@ -22,6 +22,11 @@ class DivisionRepository implements DivisionRepositoryInterface
         return $this->model->orderBy('name')->get();
     }
 
+    public function getDivisionByStatus($status)
+    {
+        return $this->model->where('status', $status)->orderBy('name')->get();
+    }
+
     public function getDivisionById($id)
     {
         try {
@@ -70,17 +75,23 @@ class DivisionRepository implements DivisionRepositoryInterface
 
     public function deleteDivision($id)
     {
+        return (bool) $this->updateDivisionStatus($id, 'Non Aktif');
+    }
+
+    public function updateDivisionStatus($id, $status)
+    {
         $division = $this->find($id);
         if (!$division) {
-            return false;
+            return null;
         }
 
         try {
-            $division->delete();
-            return true;
+            $division->status = $status;
+            $division->save();
+            return $division->fresh();
         } catch (\Exception $e) {
-            Log::error("Failed to delete division {$id}: {$e->getMessage()}");
-            return false;
+            Log::error("Failed to update division status {$id}: {$e->getMessage()}");
+            return null;
         }
     }
 

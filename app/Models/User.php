@@ -51,5 +51,25 @@ class User extends Authenticatable
     {
         return $this->password_hash;
     }
+
+    public function activePermissionNames()
+    {
+        $this->loadMissing('permissions', 'roles.permissions');
+
+        $directPermissions = $this->permissions
+            ->filter(fn ($permission) => ($permission->status ?? 'Aktif') === 'Aktif')
+            ->pluck('name');
+
+        $rolePermissions = $this->roles
+            ->filter(fn ($role) => ($role->status ?? 'Aktif') === 'Aktif')
+            ->flatMap(fn ($role) => $role->permissions)
+            ->filter(fn ($permission) => ($permission->status ?? 'Aktif') === 'Aktif')
+            ->pluck('name');
+
+        return $directPermissions
+            ->merge($rolePermissions)
+            ->unique()
+            ->values();
+    }
 }
 

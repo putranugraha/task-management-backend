@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             UserSeeder::class,
+            DemoProjectManagementSeeder::class,
             // DivisionSeeder::class,
             // ProjectSeeder::class,
             // ProjectBaselineSeeder::class,
@@ -34,7 +35,6 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 }
-
 
 
 

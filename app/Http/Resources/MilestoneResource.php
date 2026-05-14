@@ -24,7 +24,7 @@ class MilestoneResource extends JsonResource
             }),
             'created_at' => optional($this->created_at)->toDateTimeString(),
             'updated_at' => optional($this->updated_at)->toDateTimeString(),
+            'deleted_at' => optional($this->deleted_at)->toDateTimeString(),
         ];
     }
 }
-

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -36,9 +38,11 @@ class AuthController extends Controller
             return response()->json(['message' => 'Akun Anda tidak aktif.'], 403);
         }
 
-        $user->loadMissing('roles');
+        $user->loadMissing('roles.permissions', 'permissions');
 
-        $primaryRole = $user->roles->first()->name ?? null;
+        $primaryRole = $user->roles
+            ->first(fn ($role) => ($role->status ?? 'Aktif') === 'Aktif')
+            ?->name;
         $dashboardType = match ($primaryRole) {
             'Admin' => 'admin',
             'Manager' => 'manager',
@@ -53,29 +57,7 @@ class AuthController extends Controller
         };
 
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
-        if (!app()->environment('local')) {
-            $userId = $user->id;
-            $ip = $request->ip();
-            $userAgent = $request->userAgent();
-            dispatch(function () use ($userId, $ip, $userAgent) {
-                $freshUser = User::find($userId);
-                if (!$freshUser) {
-                    return;
-                }
-
-                $freshUser->forceFill([
-                    'last_login_at' => Carbon::now(),
-                ])->save();
-
-                activity('auth')
-                    ->causedBy($freshUser)
-                    ->withProperties([
-                        'ip' => $ip,
-                        'user_agent' => $userAgent,
-                    ])
-                    ->log('login');
-            })->afterResponse();
-        }
+        $this->recordAuthActivity($user, 'login', $request);
 
         return response()->json([
             'user' => [
@@ -88,8 +70,11 @@ class AuthController extends Controller
                 'last_login_at' => optional($user->last_login_at)->toDateTimeString(),
                 'role' => $primaryRole,
             ],
-            'roles' => $user->getRoleNames(),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'roles' => $user->roles
+                ->filter(fn ($role) => ($role->status ?? 'Aktif') === 'Aktif')
+                ->pluck('name')
+                ->values(),
+            'permissions' => $user->activePermissionNames(),
             'primary_role' => $primaryRole,
             'dashboard_type' => $dashboardType,
             'home_path' => $homePath,
@@ -118,14 +103,17 @@ class AuthController extends Controller
         ]);
 
         $user->assignRole('Member');
-        $user->loadMissing('division', 'roles');
+        $user->loadMissing('division', 'roles.permissions', 'permissions');
 
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
 
         return response()->json([
             'user' => new UserResource($user),
-            'roles' => $user->getRoleNames(),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'roles' => $user->roles
+                ->filter(fn ($role) => ($role->status ?? 'Aktif') === 'Aktif')
+                ->pluck('name')
+                ->values(),
+            'permissions' => $user->activePermissionNames(),
             'token' => $token,
             'message' => 'Registrasi berhasil',
         ], 201);
@@ -139,14 +127,8 @@ class AuthController extends Controller
             $user->currentAccessToken()?->delete();
         }
 
-        if ($user && !app()->environment('local')) {
-            activity('auth')
-                ->causedBy($user)
-                ->withProperties([
-                    'ip' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                ])
-                ->log('logout');
+        if ($user) {
+            $this->recordAuthActivity($user, 'logout', $request);
         }
 
         if ($request->hasSession()) {
@@ -197,5 +179,26 @@ class AuthController extends Controller
         }
 
         return response()->json(['status' => __($status)], 200);
+    }
+
+    private function recordAuthActivity(User $user, string $event, Request $request): void
+    {
+        try {
+            if ($event === 'login') {
+                $user->forceFill([
+                    'last_login_at' => Carbon::now(),
+                ])->save();
+            }
+
+            activity('auth')
+                ->causedBy($user)
+                ->withProperties([
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ])
+                ->log($event);
+        } catch (\Throwable $e) {
+            Log::warning("Failed to record auth activity {$event}: {$e->getMessage()}");
+        }
     }
 }

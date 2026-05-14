@@ -16,6 +16,8 @@ interface TaskServiceInterface
     public function createTask(array $data);
     public function updateTask($id, array $data);
     public function deleteTask($id);
+    public function getArchivedTasks(array $filters = [], int $perPage = 20);
+    public function restoreTask($id);
     public function updateTaskStatus($id, $status);
     public function updateTaskProgress($id, $percent);
     public function completeTask($id);

@@ -26,6 +26,7 @@ class DivisionUpdateRequest extends FormRequest
             ],
             'name' => 'sometimes|required|string|max:150',
             'description' => 'sometimes|nullable|string',
+            'status' => 'sometimes|in:Aktif,Non Aktif',
         ];
     }
 }

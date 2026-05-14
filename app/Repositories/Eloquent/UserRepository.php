@@ -85,19 +85,7 @@ class UserRepository implements UserRepositoryInterface
 
     public function deleteUser($id)
     {
-        $user = $this->findUser($id);
-
-        if ($user) {
-            try {
-                $user->delete();
-                return true;
-            } catch (\Exception $e) {
-                Log::error("Failed to delete user with ID {$id}: {$e->getMessage()}");
-                return false;
-            }
-        }
-
-        return false;
+        return (bool) $this->updateUserStatus($id, 'Non Aktif');
     }
 
     protected function findUser($id)

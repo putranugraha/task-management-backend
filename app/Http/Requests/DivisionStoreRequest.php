@@ -18,6 +18,7 @@ class DivisionStoreRequest extends FormRequest
             'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:150',
             'description' => 'nullable|string',
+            'status' => 'sometimes|in:Aktif,Non Aktif',
         ];
     }
 }

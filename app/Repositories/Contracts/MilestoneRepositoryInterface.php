@@ -68,6 +68,8 @@ interface MilestoneRepositoryInterface
      * @return mixed
      */
     public function deleteMilestone($id);
+    public function getArchivedMilestones(array $filters = [], int $perPage = 20);
+    public function restoreMilestone($id);
 
     /**
      * Update status milestone.

@@ -55,13 +55,25 @@ class RolePermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
+            Permission::updateOrCreate(
+                ['name' => $permission, 'guard_name' => 'web'],
+                ['status' => 'Aktif']
+            );
         }
 
         // Roles kept as in this project
-        $admin = Role::firstOrCreate(['name' => 'Admin']);
-        $manager = Role::firstOrCreate(['name' => 'Manager']);
-        $member = Role::firstOrCreate(['name' => 'Member']);
+        $admin = Role::updateOrCreate(
+            ['name' => 'Admin', 'guard_name' => 'web'],
+            ['status' => 'Aktif']
+        );
+        $manager = Role::updateOrCreate(
+            ['name' => 'Manager', 'guard_name' => 'web'],
+            ['status' => 'Aktif']
+        );
+        $member = Role::updateOrCreate(
+            ['name' => 'Member', 'guard_name' => 'web'],
+            ['status' => 'Aktif']
+        );
 
         // Admin: all permissions
         $admin->syncPermissions(Permission::all());

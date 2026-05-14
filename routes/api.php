@@ -39,9 +39,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Profile
     Route::get('/profile', function (Request $request) {
         $user = $request->user();
-        $user->loadMissing('roles');
+        $user->loadMissing('roles.permissions', 'permissions');
 
-        $primaryRole = $user->roles->first()->name ?? null;
+        $activeRoles = $user->roles
+            ->filter(fn ($role) => ($role->status ?? 'Aktif') === 'Aktif')
+            ->values();
+        $primaryRole = $activeRoles->first()->name ?? null;
         $dashboardType = match ($primaryRole) {
             'Admin' => 'admin',
             'Manager' => 'manager',
@@ -66,8 +69,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
                 'last_login_at' => optional($user->last_login_at)->toDateTimeString(),
                 'role' => $primaryRole,
             ],
-            'roles' => $user->getRoleNames(),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'roles' => $activeRoles->pluck('name'),
+            'permissions' => $user->activePermissionNames(),
             'primary_role' => $primaryRole,
             'dashboard_type' => $dashboardType,
             'home_path' => $homePath,
@@ -101,6 +104,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:membuat users'])->group
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:mengubah users'])->group(function () {
     Route::apiResource('users', UserController::class)->only(['update'])->whereNumber('user');
+    Route::patch('users/{user}/status', [UserController::class, 'updateStatus'])->whereNumber('user');
+    Route::patch('users/{user}/activate', [UserController::class, 'activate'])->whereNumber('user');
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:menghapus users'])->group(function () {
     Route::apiResource('users', UserController::class)->only(['destroy'])->whereNumber('user');
@@ -115,6 +120,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:membuat roles'])->group
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:mengubah roles'])->group(function () {
     Route::apiResource('roles', RoleController::class)->only(['update']);
+    Route::patch('roles/{role}/status', [RoleController::class, 'updateStatus'])->whereNumber('role');
+    Route::patch('roles/{role}/activate', [RoleController::class, 'activate'])->whereNumber('role');
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:menghapus roles'])->group(function () {
     Route::apiResource('roles', RoleController::class)->only(['destroy']);
@@ -148,6 +155,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:membuat project'])->gro
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:mengubah project'])->group(function () {
     Route::apiResource('divisions', DivisionController::class)->only(['update']);
+    Route::patch('divisions/{division}/status', [DivisionController::class, 'updateStatus'])->whereNumber('division');
+    Route::patch('divisions/{division}/activate', [DivisionController::class, 'activate'])->whereNumber('division');
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->group(function () {
     Route::apiResource('divisions', DivisionController::class)->only(['destroy']);
@@ -158,6 +167,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     // Stats route harus didefinisikan sebelum apiResource
     // agar tidak tertimpa oleh binding projects/{project}
     Route::get('projects/stats', [ProjectController::class, 'stats']);
+    Route::get('projects/archived', [ProjectController::class, 'archived']);
     Route::apiResource('projects', ProjectController::class)->only(['index','show']);
     Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['index','show']);
     Route::get('projects/{project}/baselines', [ProjectBaselineController::class, 'index']);
@@ -201,6 +211,8 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengubah project'])->gr
 // Project deletes
 Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->group(function () {
     Route::apiResource('projects', ProjectController::class)->only(['destroy']);
+    Route::patch('projects/{project}/restore', [ProjectController::class, 'restore']);
+    Route::delete('projects/{project}/force', [ProjectController::class, 'forceDelete']);
     Route::apiResource('project-baselines', ProjectBaselineController::class)->only(['destroy']);
     Route::apiResource('task-baselines', TaskBaselineController::class)->only(['destroy']);
     Route::delete('projects/{project}/baselines', [ProjectBaselineController::class, 'destroyByProject']);
@@ -216,6 +228,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->g
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
     // Stats route sebelum apiResource agar tidak tertimpa oleh binding {milestone}
     Route::get('milestones/stats', [MilestoneController::class, 'stats']);
+    Route::get('milestones/archived', [MilestoneController::class, 'archived']);
     Route::apiResource('milestones', MilestoneController::class)->only(['index','show']);
     // Nested listing by project
     Route::get('projects/{project}/milestones', [MilestoneController::class, 'indexByProject']);
@@ -234,6 +247,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengubah project'])->gr
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->group(function () {
     Route::apiResource('milestones', MilestoneController::class)->only(['destroy']);
+    Route::patch('milestones/{milestone}/restore', [MilestoneController::class, 'restore']);
 });
 
 // Tasks API as apiResource
@@ -241,6 +255,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->g
 Route::middleware(['auth:sanctum', 'active', 'permission:melihat tugas'])->group(function () {
     // Stats route sebelum apiResource agar tidak tertimpa oleh binding {task}
     Route::get('tasks/stats', [TaskController::class, 'stats']);
+    Route::get('tasks/archived', [TaskController::class, 'archived']);
     Route::apiResource('tasks', TaskController::class)->only(['index','show']);
     // Nested listing by project
     Route::get('projects/{project}/tasks', [TaskController::class, 'indexByProject']);
@@ -264,6 +279,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:mengubah tugas'])->grou
 });
 Route::middleware(['auth:sanctum', 'active', 'permission:menghapus tugas'])->group(function () {
     Route::apiResource('tasks', TaskController::class)->only(['destroy']);
+    Route::patch('tasks/{task}/restore', [TaskController::class, 'restore']);
 });
 
 // Task Dependencies API
@@ -416,14 +432,5 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus lampiran'])->
     Route::apiResource('attachments', AttachmentController::class)->only(['destroy']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
-
-
-
-
-
-
-
-
 
 

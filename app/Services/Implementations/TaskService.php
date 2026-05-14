@@ -114,6 +114,11 @@ class TaskService implements TaskServiceInterface
         return $this->repository->paginateTasks($filters, $perPage);
     }
 
+    public function getArchivedTasks(array $filters = [], int $perPage = 20)
+    {
+        return $this->repository->getArchivedTasks($filters, $perPage);
+    }
+
     /**
      * Hitung statistik task (total, completed, in_progress) berdasarkan filter sederhana.
      *
@@ -153,6 +158,12 @@ class TaskService implements TaskServiceInterface
         if ($requestedStatus !== null && in_array($requestedStatus, ['In Progress', 'Done'], true)) {
             $this->assertDependencyPayloadTransitionAllowed($dependencies, $requestedStatus);
         }
+
+        $this->assertDependencyScheduleAllowed(
+            $dependencies,
+            $data['start_planned'] ?? null,
+            $data['end_planned'] ?? null
+        );
 
         $task = null;
         DB::transaction(function () use (&$task, $data, $assignments, $dependencies) {
@@ -247,6 +258,7 @@ class TaskService implements TaskServiceInterface
 
     public function updateTask($id, array $data)
     {
+        $currentTask = null;
         if (array_key_exists('status', $data) && is_string($data['status'])) {
             $currentTask = $this->repository->getTaskById($id);
             if ($currentTask instanceof Task) {
@@ -256,6 +268,28 @@ class TaskService implements TaskServiceInterface
                 } else {
                     $this->assertDependencyStatusTransitionAllowed($currentTask, $data['status']);
                 }
+            }
+        }
+
+        if (
+            array_key_exists('dependencies', $data) ||
+            array_key_exists('start_planned', $data) ||
+            array_key_exists('end_planned', $data)
+        ) {
+            $currentTask = $currentTask instanceof Task ? $currentTask : $this->repository->getTaskById($id);
+            if ($currentTask instanceof Task) {
+                $dependencyPayload = $data['dependencies'] ?? null;
+                if ($dependencyPayload === null) {
+                    $currentTask->loadMissing('dependencies');
+                    $dependencyPayload = $currentTask->dependencies ?? [];
+                }
+
+                $this->assertDependencyScheduleAllowed(
+                    $dependencyPayload,
+                    array_key_exists('start_planned', $data) ? $data['start_planned'] : $currentTask->start_planned,
+                    array_key_exists('end_planned', $data) ? $data['end_planned'] : $currentTask->end_planned,
+                    (int) $currentTask->id
+                );
             }
         }
 
@@ -560,10 +594,42 @@ class TaskService implements TaskServiceInterface
                 $activity->causedBy($actor);
             }
 
-            $activity->log('deleted');
+            $activity->log('archived');
         }
 
         return $result;
+    }
+
+    public function restoreTask($id)
+    {
+        $task = $this->repository->restoreTask($id);
+        $this->clearCaches($id, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);
+
+        if ($task) {
+            $actor = Auth::user();
+
+            $properties = [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'milestone_id' => $task->milestone_id,
+                'title' => $task->title,
+                'priority' => $task->priority,
+                'status' => $task->status,
+                'percent_complete' => $task->percent_complete,
+            ];
+
+            $activity = activity('tasks')
+                ->performedOn($task instanceof Task ? $task : null)
+                ->withProperties($properties);
+
+            if ($actor) {
+                $activity->causedBy($actor);
+            }
+
+            $activity->log('restored');
+        }
+
+        return $task;
     }
 
     public function updateTaskStatus($id, $status)
@@ -622,6 +688,17 @@ class TaskService implements TaskServiceInterface
         if (!is_numeric($percent) || $percent < 0 || $percent > 100) return null;
 
         $before = $this->getTaskById($id);
+        if ($before instanceof Task) {
+            $currentPercent = (int) ($before->percent_complete ?? 0);
+            $nextPercent = (int) $percent;
+            if ($nextPercent > $currentPercent) {
+                if ($nextPercent >= 100) {
+                    $this->assertDependencyStatusTransitionAllowed($before, 'Done');
+                } elseif ($nextPercent > 0) {
+                    $this->assertDependencyStatusTransitionAllowed($before, 'In Progress');
+                }
+            }
+        }
         $task = $this->repository->updateTaskProgress($id, (int) $percent);
         $this->clearCaches(
             $id,
@@ -775,6 +852,12 @@ class TaskService implements TaskServiceInterface
                     continue;
                 }
             }
+
+            $lagViolation = $this->dependencyLagStatusViolation($type, (int) ($dependency->lag_days ?? 0), $predecessor, $targetStatus);
+            if ($lagViolation !== null) {
+                $unmet[] = $predecessorTitle.' ('.$type.': '.$lagViolation.')';
+                continue;
+            }
         }
 
         if (empty($unmet)) {
@@ -822,7 +905,7 @@ class TaskService implements TaskServiceInterface
 
         $predecessors = Task::query()
             ->whereIn('id', $dependsOnIds->all())
-            ->get(['id', 'title', 'status'])
+            ->get(['id', 'title', 'status', 'start_planned', 'end_planned', 'start_actual', 'end_actual'])
             ->keyBy('id');
 
         $unmet = [];
@@ -861,6 +944,17 @@ class TaskService implements TaskServiceInterface
                     continue;
                 }
             }
+
+            $lagViolation = $this->dependencyLagStatusViolation(
+                $type,
+                (int) ($dependency['lag_days'] ?? 0),
+                $predecessor,
+                $targetStatus
+            );
+            if ($lagViolation !== null) {
+                $unmet[] = $predecessorTitle.' ('.$type.': '.$lagViolation.')';
+                continue;
+            }
         }
 
         if (empty($unmet)) {
@@ -877,6 +971,177 @@ class TaskService implements TaskServiceInterface
                 ],
             ], 422)
         );
+    }
+
+    protected function dependencyLagStatusViolation(string $type, int $lagDays, ?Task $predecessor, string $targetStatus): ?string
+    {
+        if (!$predecessor || $lagDays === 0 || !in_array($targetStatus, ['In Progress', 'Done'], true)) {
+            return null;
+        }
+
+        $type = strtoupper($type);
+        $anchor = null;
+        $anchorLabel = null;
+
+        if (in_array($type, ['FS', 'FF'], true)) {
+            $anchor = $this->parseDependencyDate($predecessor->end_actual)
+                ?? $this->parseDependencyDate($predecessor->end_planned);
+            $anchorLabel = 'finish predecessor';
+        } elseif (in_array($type, ['SS', 'SF'], true)) {
+            $anchor = $this->parseDependencyDate($predecessor->start_actual)
+                ?? $this->parseDependencyDate($predecessor->start_planned);
+            $anchorLabel = 'start predecessor';
+        }
+
+        if (!$anchor) {
+            return null;
+        }
+
+        $allowedAt = $anchor->copy()->addDays($lagDays);
+        if (Carbon::today()->lt($allowedAt)) {
+            return sprintf(
+                'lag %d hari dari %s belum terpenuhi, minimal %s',
+                $lagDays,
+                $anchorLabel,
+                $allowedAt->toDateString()
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * Validate planned dates against dependency relation type and lag.
+     *
+     * FS: successor start >= predecessor finish + lag
+     * SS: successor start >= predecessor start + lag
+     * FF: successor finish >= predecessor finish + lag
+     * SF: successor finish >= predecessor start + lag
+     *
+     * @param mixed $dependencies
+     */
+    protected function assertDependencyScheduleAllowed($dependencies, $successorStart, $successorEnd, ?int $successorId = null): void
+    {
+        if (!is_array($dependencies) && !($dependencies instanceof \Illuminate\Support\Collection)) {
+            return;
+        }
+
+        $items = collect($dependencies)->filter();
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $successorStartDate = $this->parseDependencyDate($successorStart);
+        $successorEndDate = $this->parseDependencyDate($successorEnd);
+
+        if (!$successorStartDate && !$successorEndDate) {
+            return;
+        }
+
+        $dependsOnIds = $items
+            ->map(function ($dependency) {
+                if (is_array($dependency)) {
+                    return (int) ($dependency['depends_on_task_id'] ?? 0);
+                }
+                return (int) ($dependency->depends_on_task_id ?? 0);
+            })
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($dependsOnIds->isEmpty()) {
+            return;
+        }
+
+        $predecessors = Task::query()
+            ->whereIn('id', $dependsOnIds->all())
+            ->get(['id', 'title', 'start_planned', 'end_planned'])
+            ->keyBy('id');
+
+        $violations = [];
+
+        foreach ($items as $dependency) {
+            $dependsOnId = is_array($dependency)
+                ? (int) ($dependency['depends_on_task_id'] ?? 0)
+                : (int) ($dependency->depends_on_task_id ?? 0);
+
+            if ($dependsOnId <= 0 || ($successorId !== null && $dependsOnId === $successorId)) {
+                continue;
+            }
+
+            $type = strtoupper((string) (is_array($dependency) ? ($dependency['type'] ?? 'FS') : ($dependency->type ?? 'FS')));
+            $lagDays = (int) (is_array($dependency) ? ($dependency['lag_days'] ?? 0) : ($dependency->lag_days ?? 0));
+            $predecessor = $predecessors->get($dependsOnId);
+            if (!$predecessor) {
+                continue;
+            }
+
+            $predecessorStart = $this->parseDependencyDate($predecessor->start_planned);
+            $predecessorEnd = $this->parseDependencyDate($predecessor->end_planned);
+            $predecessorTitle = $predecessor->title ?? ('#'.$dependsOnId);
+
+            $required = null;
+            $actual = null;
+            $anchor = '';
+
+            if ($type === 'FS' && $predecessorEnd && $successorStartDate) {
+                $required = $predecessorEnd->copy()->addDays($lagDays);
+                $actual = $successorStartDate;
+                $anchor = 'start harus >= finish predecessor';
+            } elseif ($type === 'SS' && $predecessorStart && $successorStartDate) {
+                $required = $predecessorStart->copy()->addDays($lagDays);
+                $actual = $successorStartDate;
+                $anchor = 'start harus >= start predecessor';
+            } elseif ($type === 'FF' && $predecessorEnd && $successorEndDate) {
+                $required = $predecessorEnd->copy()->addDays($lagDays);
+                $actual = $successorEndDate;
+                $anchor = 'finish harus >= finish predecessor';
+            } elseif ($type === 'SF' && $predecessorStart && $successorEndDate) {
+                $required = $predecessorStart->copy()->addDays($lagDays);
+                $actual = $successorEndDate;
+                $anchor = 'finish harus >= start predecessor';
+            }
+
+            if ($required && $actual && $actual->lt($required)) {
+                $violations[] = sprintf(
+                    '%s (%s + lag %d hari: %s, minimal %s)',
+                    $predecessorTitle,
+                    $type,
+                    $lagDays,
+                    $anchor,
+                    $required->toDateString()
+                );
+            }
+        }
+
+        if (empty($violations)) {
+            return;
+        }
+
+        $message = 'Tanggal rencana task tidak sesuai dependency: '.implode(', ', $violations);
+
+        throw new HttpResponseException(
+            response()->json([
+                'message' => $message,
+                'errors' => [
+                    'dependencies' => [$message],
+                ],
+            ], 422)
+        );
+    }
+
+    protected function parseDependencyDate($value): ?Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy()->startOfDay();
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->startOfDay();
+        }
+        if (is_string($value) && trim($value) !== '') {
+            return Carbon::parse($value)->startOfDay();
+        }
+        return null;
     }
 
     /**
