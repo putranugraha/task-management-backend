@@ -1241,6 +1241,9 @@ class TaskService implements TaskServiceInterface
             if (!$assignee instanceof User) {
                 continue;
             }
+            if ($actor && (int) $assignee->id === (int) $actor->id) {
+                continue;
+            }
 
             $role = $assignment->role_on_task ?: 'Member';
 

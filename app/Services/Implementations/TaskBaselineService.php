@@ -3,6 +3,7 @@
 namespace App\Services\Implementations;
 
 use App\Models\Task;
+use App\Models\TaskAssignment;
 use App\Models\ProjectBaseline;
 use App\Repositories\Contracts\TaskBaselineRepositoryInterface;
 use App\Services\Contracts\TaskBaselineServiceInterface;
@@ -104,10 +105,30 @@ class TaskBaselineService implements TaskBaselineServiceInterface
                 $weight = 1;
             }
 
-            // Planned effort hours default = duration × 8 if not provided
+            // Planned effort hours default = assignment snapshot, then duration x 8.
             $plannedEffort = $data['planned_effort_hours'] ?? null;
+            if ($plannedEffort === null) {
+                $assignmentEffort = (float) TaskAssignment::where('task_id', $task->id)
+                    ->sum('estimated_effort_hours');
+                if ($assignmentEffort > 0) {
+                    $plannedEffort = $assignmentEffort;
+                }
+            }
             if ($plannedEffort === null && !empty($durationBase)) {
                 $plannedEffort = (float) $durationBase * 8.0;
+            }
+
+            $budgetCostBase = $data['budget_cost_base'] ?? null;
+            if ($budgetCostBase === null) {
+                $budgetCostBase = max(0.0, (float) ($task->budget_cost ?? 0));
+                if ($baselineId) {
+                    $baseline = ProjectBaseline::find($baselineId);
+                    $projectValue = max(0.0, (float) ($baseline?->value_amount_base ?? 0));
+                    $totalTaskBudget = max(0.0, (float) Task::where('project_id', $task->project_id)->sum('budget_cost'));
+                    if ($projectValue > 0 && $totalTaskBudget > 0) {
+                        $budgetCostBase = round($budgetCostBase * ($projectValue / $totalTaskBudget), 2);
+                    }
+                }
             }
 
             $baselineData = [
@@ -118,6 +139,7 @@ class TaskBaselineService implements TaskBaselineServiceInterface
                 'duration_planned_base' => $durationBase,
                 'weight' => $weight,
                 'planned_effort_hours' => $plannedEffort,
+                'budget_cost_base' => $budgetCostBase,
             ];
 
             // Upsert by unique key (baseline_id, task_id)

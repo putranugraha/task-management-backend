@@ -33,6 +33,7 @@ class ProjectBaselineUpdateRequest extends FormRequest
             'note' => 'sometimes|nullable|string',
             'start_planned_base' => ['sometimes','nullable','date'],
             'end_planned_base' => ['sometimes','nullable','date','after_or_equal:start_planned_base'],
+            'value_amount_base' => ['sometimes','nullable','numeric','min:0'],
         ];
     }
 

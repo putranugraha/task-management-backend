@@ -23,6 +23,7 @@ class TaskBaselineStoreRequest extends FormRequest
             'duration_planned_base' => ['nullable', 'integer', 'min:0'],
             'weight' => ['nullable', 'numeric', 'min:0'],
             'planned_effort_hours' => ['nullable', 'numeric', 'min:0'],
+            'budget_cost_base' => ['nullable', 'numeric', 'min:0'],
         ];
 
         // Enforce uniqueness only when baseline_id is provided

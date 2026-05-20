@@ -19,7 +19,6 @@ class EvmCostService implements EvmCostServiceInterface
         $asOfDate = $asOf->toDateString();
 
         $project = Project::findOrFail($projectId);
-
         // Validate that baseline belongs to the project (if provided)
         if ($baselineId) {
             $baselineOk = ProjectBaseline::where('project_id', $projectId)
@@ -65,13 +64,13 @@ class EvmCostService implements EvmCostServiceInterface
             }
         }
 
-        // Baseline schedule map: task_id -> [start_planned_base, duration_planned_base]
+        // Baseline map: task_id -> cost and schedule snapshot.
         $taskBaselineMap = [];
         if ($baselineId && ! empty($taskIds)) {
             $taskBaselineMap = TaskBaseline::query()
                 ->where('baseline_id', $baselineId)
                 ->whereIn('task_id', $taskIds)
-                ->get(['task_id', 'start_planned_base', 'duration_planned_base'])
+                ->get(['task_id', 'start_planned_base', 'duration_planned_base', 'budget_cost_base'])
                 ->keyBy('task_id')
                 ->toArray();
         }
@@ -89,6 +88,8 @@ class EvmCostService implements EvmCostServiceInterface
         }
 
         $sumBudgetCost = 0.0;
+        $sumEvmBudgetCost = 0.0;
+        $baselineBudgetRows = 0;
         $totalPV = 0.0;
         $totalEV = 0.0;
         $totalAC = 0.0;
@@ -96,11 +97,23 @@ class EvmCostService implements EvmCostServiceInterface
         foreach ($tasks as $task) {
             $taskId = $task->id;
 
-            $budgetCost = (float) ($task->budget_cost ?? 0);
-            if ($budgetCost < 0) $budgetCost = 0;
-            $sumBudgetCost += $budgetCost;
+            $currentBudgetCost = (float) ($task->budget_cost ?? 0);
+            if ($currentBudgetCost < 0) $currentBudgetCost = 0;
+            $sumBudgetCost += $currentBudgetCost;
 
             $baseRow = $taskBaselineMap[$taskId] ?? null;
+            $hasBaselineBudget = $baseRow !== null
+                && array_key_exists('budget_cost_base', $baseRow)
+                && $baseRow['budget_cost_base'] !== null;
+            $budgetCost = $hasBaselineBudget
+                ? (float) $baseRow['budget_cost_base']
+                : $currentBudgetCost;
+            if ($budgetCost < 0) $budgetCost = 0;
+            if ($hasBaselineBudget) {
+                $baselineBudgetRows++;
+            }
+            $sumEvmBudgetCost += $budgetCost;
+
             $startPlanned = $baseRow['start_planned_base'] ?? $task->start_planned;
             $durationPlanned = (int) ($baseRow['duration_planned_base'] ?? $task->duration_planned ?? 0);
 
@@ -133,10 +146,19 @@ class EvmCostService implements EvmCostServiceInterface
         $cv = $totalEV - $totalAC;
         $cpi = ($totalAC > 0.0) ? ($totalEV / $totalAC) : null;
 
-        // BAC rule: prefer project value_amount when set; otherwise sum task budgets
+        // BAC rule:
+        // - With a baseline and stored task cost snapshots, use the baseline snapshot.
+        // - Without a baseline, keep the current-plan behavior.
         $projectValue = (float) ($project->value_amount ?? 0);
-        $bac = $projectValue > 0 ? $projectValue : $sumBudgetCost;
-        $bacSource = $projectValue > 0 ? 'projects.value_amount' : 'sum(tasks.budget_cost)';
+        if ($baselineId && $baselineBudgetRows > 0) {
+            $bac = $sumEvmBudgetCost;
+            $bacSource = 'sum(task_baselines.budget_cost_base)';
+            $pvEvSource = 'task_baselines.budget_cost_base';
+        } else {
+            $bac = $projectValue > 0 ? $projectValue : $sumBudgetCost;
+            $bacSource = $projectValue > 0 ? 'projects.value_amount' : 'sum(tasks.budget_cost)';
+            $pvEvSource = 'tasks.budget_cost';
+        }
 
         $eac = null;
         $etc = null;
@@ -162,10 +184,11 @@ class EvmCostService implements EvmCostServiceInterface
             'etc' => $etc !== null ? round((float) $etc, 2) : null,
             'meta' => [
                 'bac_source' => $bacSource,
-                'pv_ev_source' => 'tasks.budget_cost',
+                'pv_ev_source' => $pvEvSource,
                 'ac_source' => 'task_cost_entries',
                 'task_count' => count($taskIds),
                 'baseline_used' => $baselineId !== null,
+                'baseline_budget_rows' => $baselineBudgetRows,
                 'planned_fraction_inclusive_days' => true,
             ],
         ];

@@ -19,8 +19,10 @@ use App\Models\TaskDependency;
 use App\Models\TaskProgressEntry;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Notifications\TaskActivityNotification;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
@@ -252,6 +254,7 @@ class DemoProjectManagementSeeder extends Seeder
                 $periodIds = ReportingPeriod::where('project_id', $project->id)->pluck('id');
 
                 if ($taskIds->isNotEmpty()) {
+                    $this->deleteDemoTaskNotifications($taskIds->all());
                     TaskDependency::whereIn('task_id', $taskIds)->orWhereIn('depends_on_task_id', $taskIds)->delete();
                     TaskAssignment::whereIn('task_id', $taskIds)->delete();
                     TaskCostEntry::whereIn('task_id', $taskIds)->delete();
@@ -367,13 +370,15 @@ class DemoProjectManagementSeeder extends Seeder
         $assigneeKey = $taskData['assignee'];
         $assignee = $this->users[$assigneeKey] ?? $this->users['gustra'];
 
-        TaskAssignment::create([
+        $assignment = TaskAssignment::create([
             'task_id' => $task->id,
             'user_id' => $assignee->id,
             'role_on_task' => $this->taskRoleOnTask($assigneeKey),
             'estimated_effort_hours' => max(4, ($task->duration_planned ?? 1) * 6),
             'assigned_at' => Carbon::parse($taskData['start_planned'])->startOfDay(),
         ]);
+
+        $this->notifyDemoAssignee($task, $assignee, $assignment->role_on_task ?: 'Member');
 
         if ($taskData['start_actual']) {
             StatusHistory::create([
@@ -435,6 +440,40 @@ class DemoProjectManagementSeeder extends Seeder
             'gustra' => 'Software Engineer',
             default => 'Developer',
         };
+    }
+
+    private function notifyDemoAssignee(Task $task, User $assignee, string $roleOnTask): void
+    {
+        $assignee->notify(new TaskActivityNotification('task_assigned', [
+            'task_id' => $task->id,
+            'task_title' => $task->title,
+            'entity_type' => 'Task',
+            'entity_id' => $task->id,
+            'actor_id' => null,
+            'actor_name' => 'System Seeder',
+            'message' => 'Anda ditugaskan pada task '.$task->title.' sebagai '.$roleOnTask,
+        ]));
+    }
+
+    /**
+     * Remove stale notifications from previous demo task ids before reseeding.
+     *
+     * @param array<int> $taskIds
+     */
+    private function deleteDemoTaskNotifications(array $taskIds): void
+    {
+        $taskIdSet = array_fill_keys(array_map('intval', $taskIds), true);
+
+        DatabaseNotification::query()
+            ->where('type', TaskActivityNotification::class)
+            ->get()
+            ->each(function (DatabaseNotification $notification) use ($taskIdSet) {
+                $payload = $notification->data ?? [];
+                $taskId = (int) ($payload['task_id'] ?? 0);
+                if ($taskId > 0 && isset($taskIdSet[$taskId])) {
+                    $notification->delete();
+                }
+            });
     }
 
     private function seedProjectReporting(Project $project, $tasks): void

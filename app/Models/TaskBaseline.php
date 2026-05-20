@@ -20,6 +20,7 @@ class TaskBaseline extends Model
         'duration_planned_base',
         'weight',
         'planned_effort_hours',
+        'budget_cost_base',
     ];
 
     /**
@@ -33,6 +34,7 @@ class TaskBaseline extends Model
             'duration_planned_base' => 'integer',
             'weight' => 'decimal:2',
             'planned_effort_hours' => 'decimal:2',
+            'budget_cost_base' => 'decimal:2',
         ];
     }
 

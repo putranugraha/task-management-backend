@@ -17,6 +17,7 @@ class ProjectBaselineResource extends JsonResource
             'note' => $this->note,
             'start_planned_base' => optional($this->start_planned_base)->toDateString(),
             'end_planned_base' => optional($this->end_planned_base)->toDateString(),
+            'value_amount_base' => $this->value_amount_base !== null ? (float) $this->value_amount_base : null,
             'project' => $this->whenLoaded('project', function () {
                 return [
                     'id' => $this->project->id,

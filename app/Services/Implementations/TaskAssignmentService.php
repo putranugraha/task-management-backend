@@ -53,6 +53,13 @@ class TaskAssignmentService implements TaskAssignmentServiceInterface
 
     public function createAssignment(array $data)
     {
+        $hadAssignmentForUser = false;
+        if (!empty($data['task_id']) && !empty($data['user_id'])) {
+            $hadAssignmentForUser = TaskAssignment::where('task_id', $data['task_id'])
+                ->where('user_id', $data['user_id'])
+                ->exists();
+        }
+
         $assignment = $this->repository->createAssignment($data);
         $this->clearCaches($assignment->id ?? null, $assignment->task_id ?? null, $assignment->user_id ?? null);
 
@@ -81,7 +88,8 @@ class TaskAssignmentService implements TaskAssignmentServiceInterface
             $task = Task::find($assignment->task_id);
             $assignee = User::find($assignment->user_id);
 
-            if ($task && $assignee) {
+            $isSelfAssignment = $actor && (int) $actor->id === (int) $assignee?->id;
+            if ($task && $assignee && ! $hadAssignmentForUser && ! $isSelfAssignment) {
                 $payload = [
                     'task_id' => $task->id,
                     'task_title' => $task->title,

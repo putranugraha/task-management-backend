@@ -6,6 +6,7 @@ use App\Models\ProjectBaseline;
 use App\Models\Task;
 use App\Models\TaskAssignment;
 use App\Models\TaskBaseline;
+use App\Models\TaskProgressEntry;
 use App\Models\TimeEntry;
 use App\Services\Contracts\EvmServiceInterface;
 use App\Services\Contracts\ProjectBaselineServiceInterface;
@@ -37,6 +38,9 @@ class EvmService implements EvmServiceInterface
             $baseline = ProjectBaseline::where('project_id', $projectId)
                 ->where('id', $baselineId)
                 ->first();
+            if (! $baseline) {
+                abort(422, 'Invalid baseline_id for this project.');
+            }
         }
         if (!$baseline) {
             $baseline = $this->baselineService->getLatestBaselineByProject($projectId);
@@ -74,6 +78,25 @@ class EvmService implements EvmServiceInterface
                 ->toArray();
         }
 
+        // Historical progress (EV) up to as-of date: task_id -> latest percent_complete.
+        // Falls back to current percent only for today's query when no history exists yet.
+        $progressAsOf = [];
+        if (!empty($taskIds)) {
+            try {
+                $progressAsOf = TaskProgressEntry::query()
+                    ->whereIn('task_id', $taskIds)
+                    ->whereDate('progress_date', '<=', $asOfDate)
+                    ->selectRaw('DISTINCT ON (task_id) task_id, percent_complete')
+                    ->orderBy('task_id')
+                    ->orderByDesc('progress_date')
+                    ->orderByDesc('id')
+                    ->pluck('percent_complete', 'task_id')
+                    ->toArray();
+            } catch (\Throwable $e) {
+                $progressAsOf = [];
+            }
+        }
+
         // Sum actual hours (AC) up to the date, grouped by task
         $acSums = [];
         if (!empty($taskIds)) {
@@ -90,29 +113,29 @@ class EvmService implements EvmServiceInterface
         $totalPV = 0.0;
         $totalEV = 0.0;
         $totalAC = 0.0;
+        $baselineEffortRows = 0;
 
         foreach ($tasks as $task) {
             $taskId = $task->id;
 
-            // Planned effort prioritization:
-            // 1) sum(assignment estimated_effort_hours)
-            // 2) TaskBaseline.planned_effort_hours
-            // 3) duration_planned_base × 8 (or task duration × 8)
+            // Planned effort priority:
+            // 1) task_baselines.planned_effort_hours when a baseline is selected
+            // 2) current assignment estimated effort
+            // 3) duration x 8 fallback
             $plannedEffort = null;
-            $assignEffort = (float) ($assignSums[$taskId] ?? 0);
-            if ($assignEffort > 0) {
-                $plannedEffort = $assignEffort;
-            }
-
-            // Baseline/task planning dates and duration for PV fraction
             $baseRow = $taskBaselineMap[$taskId] ?? null;
             $startPlanned = $baseRow['start_planned_base'] ?? $task->start_planned;
             $durationPlanned = (int) ($baseRow['duration_planned_base'] ?? $task->duration_planned ?? 0);
-            if ($plannedEffort === null) {
-                $tbEffort = isset($baseRow['planned_effort_hours']) ? (float) $baseRow['planned_effort_hours'] : 0.0;
-                if ($tbEffort > 0) {
-                    $plannedEffort = $tbEffort;
-                }
+
+            $tbEffort = isset($baseRow['planned_effort_hours']) ? (float) $baseRow['planned_effort_hours'] : 0.0;
+            if ($baselineId && $tbEffort > 0) {
+                $plannedEffort = $tbEffort;
+                $baselineEffortRows++;
+            }
+
+            $assignEffort = (float) ($assignSums[$taskId] ?? 0);
+            if (($plannedEffort === null || $plannedEffort <= 0) && $assignEffort > 0) {
+                $plannedEffort = $assignEffort;
             }
 
             // Fallback planned effort if no assignments
@@ -137,7 +160,14 @@ class EvmService implements EvmServiceInterface
 
             $plannedEffort = (float) ($plannedEffort ?? 0.0);
             $pv = $plannedEffort * $fraction;
-            $pct = (int) ($task->percent_complete ?? 0);
+            $today = Carbon::today()->toDateString();
+            if (array_key_exists($taskId, $progressAsOf)) {
+                $pct = (int) $progressAsOf[$taskId];
+            } elseif ($asOfDate === $today) {
+                $pct = (int) ($task->percent_complete ?? 0);
+            } else {
+                $pct = 0;
+            }
             if ($pct < 0) $pct = 0;
             if ($pct > 100) $pct = 100;
             $ev = $plannedEffort * ($pct / 100);
@@ -168,7 +198,11 @@ class EvmService implements EvmServiceInterface
             'meta' => [
                 'hours_per_day' => self::HOURS_PER_DAY,
                 'task_count' => count($taskIds),
-                'assignments_as_primary_effort' => true,
+                'planned_effort_source' => ($baselineId && $baselineEffortRows > 0)
+                    ? 'task_baselines.planned_effort_hours'
+                    : 'task_assignments.estimated_effort_hours',
+                'assignments_as_primary_effort' => !($baselineId && $baselineEffortRows > 0),
+                'baseline_effort_rows' => $baselineEffortRows,
                 'pv_fraction_inclusive_days' => true,
                 'baseline_used' => $baselineId !== null,
             ],

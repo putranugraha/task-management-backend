@@ -18,6 +18,7 @@ class TaskBaselineResource extends JsonResource
             'duration_planned_base' => $this->duration_planned_base,
             'weight' => $this->weight !== null ? (float) $this->weight : null,
             'planned_effort_hours' => $this->planned_effort_hours !== null ? (float) $this->planned_effort_hours : null,
+            'budget_cost_base' => $this->budget_cost_base !== null ? (float) $this->budget_cost_base : null,
             'baseline' => $this->whenLoaded('baseline', function () {
                 return [
                     'id' => $this->baseline->id,

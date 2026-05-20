@@ -19,6 +19,7 @@ class ProjectBaseline extends Model
         'note',
         'start_planned_base',
         'end_planned_base',
+        'value_amount_base',
     ];
 
     /**
@@ -30,6 +31,7 @@ class ProjectBaseline extends Model
             'taken_at' => 'datetime',
             'start_planned_base' => 'date',
             'end_planned_base' => 'date',
+            'value_amount_base' => 'decimal:2',
         ];
     }
 

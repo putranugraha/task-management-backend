@@ -6,6 +6,7 @@ use App\Repositories\Contracts\KpiSnapshotRepositoryInterface;
 use App\Services\Contracts\KpiSnapshotServiceInterface;
 use App\Models\KpiSnapshot;
 use App\Models\ReportingPeriod;
+use App\Models\StatusHistory;
 use App\Models\Task;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -117,24 +118,53 @@ class KpiSnapshotService implements KpiSnapshotServiceInterface
         Cache::forget('reporting_periods.project.'.$projectId);
         Cache::forget('reporting_period.date.'.$projectId.'.'.$date->toDateString());
 
-        $tasks = Task::where('project_id', $projectId)->get();
+        $asOfEnd = $date->copy()->endOfDay();
+        $tasks = Task::withTrashed()
+            ->where('project_id', $projectId)
+            ->where('created_at', '<=', $asOfEnd)
+            ->where(function ($query) use ($asOfEnd) {
+                $query->whereNull('deleted_at')
+                    ->orWhere('deleted_at', '>', $asOfEnd);
+            })
+            ->get();
         $tasksTotal = $tasks->count();
-        $tasksDone = $tasks->where('status', 'Done')->count();
+        $taskIds = $tasks->pluck('id')->all();
+        $statusAsOf = $this->taskStatusesAsOf($taskIds, $asOfEnd);
+
+        $tasksDone = $tasks
+            ->filter(function ($task) use ($asOfEnd, $statusAsOf) {
+                $status = $statusAsOf[$task->id] ?? $task->status;
+                $endActual = $task->end_actual ? Carbon::parse($task->end_actual)->endOfDay() : null;
+
+                return $this->isDoneStatus($status)
+                    && ($endActual === null || $endActual->lessThanOrEqualTo($asOfEnd));
+            })
+            ->count();
 
         $overdueCount = $tasks
-            ->filter(function ($task) use ($date) {
+            ->filter(function ($task) use ($date, $asOfEnd, $statusAsOf) {
                 if (empty($task->end_planned)) {
                     return false;
                 }
 
                 $plannedEnd = Carbon::parse($task->end_planned);
+                $status = $statusAsOf[$task->id] ?? $task->status;
+                $endActual = $task->end_actual ? Carbon::parse($task->end_actual)->endOfDay() : null;
+                $doneByAsOf = $this->isDoneStatus($status)
+                    && ($endActual === null || $endActual->lessThanOrEqualTo($asOfEnd));
 
-                return $plannedEnd->lessThan($date) && $task->status !== 'Done';
+                return $plannedEnd->lessThan($date) && ! $doneByAsOf;
             })
             ->count();
 
         $cycleTimes = $tasks
-            ->filter(fn ($task) => $task->start_actual && $task->end_actual)
+            ->filter(function ($task) use ($asOfEnd) {
+                if (! $task->start_actual || ! $task->end_actual) {
+                    return false;
+                }
+
+                return Carbon::parse($task->end_actual)->endOfDay()->lessThanOrEqualTo($asOfEnd);
+            })
             ->map(function ($task) {
                 $start = Carbon::parse($task->start_actual);
                 $end = Carbon::parse($task->end_actual);
@@ -160,6 +190,61 @@ class KpiSnapshotService implements KpiSnapshotServiceInterface
         $this->clearCaches($snap->id ?? null, $projectId, $period->id);
 
         return $snap->fresh(['project', 'reportingPeriod']);
+    }
+
+    /**
+     * Resolve task statuses as they were at the snapshot date.
+     *
+     * If there is no prior history, use the first future row's from_status to infer
+     * the status before that change. This keeps old KPI generation from using a
+     * task's current status after it has changed.
+     *
+     * @param array<int> $taskIds
+     * @return array<int, string|null>
+     */
+    protected function taskStatusesAsOf(array $taskIds, Carbon $asOfEnd): array
+    {
+        if (empty($taskIds)) {
+            return [];
+        }
+
+        $histories = StatusHistory::query()
+            ->whereIn('task_id', $taskIds)
+            ->orderBy('task_id')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['task_id', 'from_status', 'to_status', 'created_at']);
+
+        $result = [];
+        foreach ($histories->groupBy('task_id') as $taskId => $rows) {
+            $latestBefore = null;
+            $firstAfter = null;
+
+            foreach ($rows as $row) {
+                $changedAt = Carbon::parse($row->created_at);
+                if ($changedAt->lessThanOrEqualTo($asOfEnd)) {
+                    $latestBefore = $row;
+                    continue;
+                }
+
+                $firstAfter = $row;
+                break;
+            }
+
+            if ($latestBefore) {
+                $result[(int) $taskId] = $latestBefore->to_status;
+            } elseif ($firstAfter) {
+                $result[(int) $taskId] = $firstAfter->from_status;
+            }
+        }
+
+        return $result;
+    }
+
+    protected function isDoneStatus(?string $status): bool
+    {
+        return strtolower(trim((string) $status)) === 'done'
+            || strtolower(trim((string) $status)) === 'selesai';
     }
 
     protected function clearCaches($id = null, $projectId = null, $periodId = null): void
