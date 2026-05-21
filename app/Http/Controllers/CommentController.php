@@ -1,0 +1,209 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Http\Requests\CommentStoreRequest;
+use App\Http\Requests\CommentUpdateRequest;
+use App\Http\Resources\CommentResource;
+use App\Models\Task;
+use App\Models\TaskAssignment;
+use App\Models\User;
+use App\Notifications\TaskActivityNotification;
+use App\Services\Contracts\CommentServiceInterface;
+use App\Support\TaskHistoryLogger;
+
+class CommentController extends Controller
+{
+    protected CommentServiceInterface $service;
+
+    public function __construct(CommentServiceInterface $service)
+    {
+        $this->service = $service;
+    }
+
+    public function index(Request $request)
+    {
+        // Support route-based entity aliases
+        $routeTask = $request->route('task');
+        $entityMap = ['tasks' => 'Task', 'projects' => 'Project', 'milestones' => 'Milestone'];
+        $entityType = $request->query('entity_type');
+        $entityId = $request->query('entity_id');
+        $userId = $request->query('user_id');
+        $include = $request->query('include'); // entity,user
+
+        // Resolve route aliases to entity_type/entity_id
+        foreach ($entityMap as $segment => $type) {
+            if ($request->is("api/{$segment}/*/comments")) {
+                $entityType = $type;
+                $entityId = $request->route(substr($segment, 0, -1)); // task|project|milestone
+                break;
+            }
+        }
+
+        $filters = [];
+
+        if ($entityType && $entityId) {
+            $filters['entity_type'] = $entityType;
+            $filters['entity_id'] = $entityId;
+        }
+
+        if ($userId) {
+            $filters['user_id'] = $userId;
+        }
+
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
+        $items = $this->service->paginateComments($filters, $perPage);
+
+        if ($include) {
+            $map = ['entity' => 'entity', 'user' => 'user'];
+            $rels = collect(explode(',', $include))
+                ->map(fn ($s) => trim($s))
+                ->filter()
+                ->map(fn ($key) => $map[$key] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+
+            if (!empty($rels)) {
+                $items->getCollection()->load($rels);
+            }
+        }
+
+        return CommentResource::collection($items);
+    }
+
+    public function store(CommentStoreRequest $request)
+    {
+        $row = $this->service->createComment($request->validated());
+        if (!$row) return response()->json(['message' => 'Gagal membuat komentar'], 400);
+
+        $actor = $request->user();
+
+        if ($row->entity_type === 'Task') {
+            $task = Task::find($row->entity_id);
+
+            if ($task) {
+                $snippet = trim((string) ($row->content ?? ''));
+                $snippet = preg_replace('/\s+/', ' ', $snippet ?? '') ?? '';
+                if (strlen($snippet) > 120) {
+                    $snippet = substr($snippet, 0, 117).'...';
+                }
+                $note = 'Komentar ditambahkan'.($snippet !== '' ? (': '.$snippet) : '');
+                TaskHistoryLogger::log($task, $actor?->id, $note);
+
+                $payload = [
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'entity_type' => 'Task',
+                    'entity_id' => $task->id,
+                    'comment_id' => $row->id,
+                    'actor_id' => $actor?->id,
+                    'actor_name' => $actor?->name,
+                    'message' => 'Komentar baru ditambahkan pada task '.$task->title,
+                ];
+
+                $assignedUsers = TaskAssignment::where('task_id', $task->id)
+                    ->with('user')
+                    ->get()
+                    ->pluck('user')
+                    ->filter();
+
+                $admins = User::role('Admin')->get();
+
+                $targets = $assignedUsers->merge($admins)->unique('id');
+
+                foreach ($targets as $target) {
+                    if ($actor && $target->id === $actor->id) {
+                        continue;
+                    }
+
+                    $target->notify(new TaskActivityNotification('comment_added', $payload));
+                }
+            }
+        }
+
+        // Pastikan relasi user ter-load agar FE bisa menampilkan nama user
+        $row->load('user');
+        return new CommentResource($row);
+    }
+
+    public function show(string $id)
+    {
+        $row = $this->service->getCommentById($id);
+        if (!$row) return response()->json(['message' => 'Komentar tidak ditemukan'], 404);
+        $include = request()->query('include');
+        if ($include) {
+            $map = ['entity' => 'entity', 'user' => 'user'];
+            $rels = collect(explode(',', $include))->map(fn($s) => trim($s))->filter()->map(fn($key) => $map[$key] ?? null)->filter()->values()->all();
+            if (!empty($rels)) $row->load($rels);
+        }
+        return new CommentResource($row);
+    }
+
+    public function update(CommentUpdateRequest $request, string $id)
+    {
+        $before = $this->service->getCommentById($id);
+        $row = $this->service->updateComment($id, $request->validated());
+        if (!$row) return response()->json(['message' => 'Komentar tidak ditemukan atau invalid'], 404);
+        if (($row->entity_type ?? null) === 'Task') {
+            $task = Task::find($row->entity_id);
+            $actorId = $request->user()?->id;
+            $note = 'Komentar diperbarui';
+            if ($before && ($before->content ?? null) !== ($row->content ?? null)) {
+                $note .= ' (konten berubah)';
+            }
+            TaskHistoryLogger::log($task, $actorId, $note);
+        }
+        return new CommentResource($row);
+    }
+
+    public function destroy(string $id)
+    {
+        $before = $this->service->getCommentById($id);
+        $deleted = $this->service->deleteComment($id);
+        if (!$deleted) return response()->json(['message' => 'Komentar tidak ditemukan'], 404);
+        if (($before?->entity_type ?? null) === 'Task') {
+            $task = Task::find($before->entity_id);
+            $actorId = request()->user()?->id;
+            TaskHistoryLogger::log($task, $actorId, 'Komentar dihapus');
+        }
+        return response()->json(['message' => 'Komentar berhasil dihapus']);
+    }
+
+    public function destroyByEntity(Request $request)
+    {
+        $request->validate([
+            'entity_type' => 'required|in:Task,Project,Milestone',
+            'entity_id' => 'required|integer',
+        ]);
+        $entityType = $request->input('entity_type');
+        $entityId = (int) $request->input('entity_id');
+        $deleted = $this->service->deleteCommentsByEntity($entityType, $entityId);
+        if (!$deleted) return response()->json(['message' => 'Tidak ada komentar dihapus atau entity tidak ditemukan'], 404);
+        if ($entityType === 'Task') {
+            $task = Task::find($entityId);
+            $actorId = $request->user()?->id;
+            TaskHistoryLogger::log($task, $actorId, 'Seluruh komentar dihapus');
+        }
+        return response()->json(['message' => 'Seluruh komentar untuk entity dihapus']);
+    }
+
+    public function countByEntity(Request $request)
+    {
+        $request->validate([
+            'entity_type' => 'required|in:Task,Project,Milestone',
+            'entity_id' => 'required|integer',
+        ]);
+        $count = $this->service->countCommentsByEntity($request->input('entity_type'), (int) $request->input('entity_id'));
+        return response()->json([
+            'entity_type' => $request->input('entity_type'),
+            'entity_id' => (int) $request->input('entity_id'),
+            'count' => $count,
+        ]);
+    }
+}

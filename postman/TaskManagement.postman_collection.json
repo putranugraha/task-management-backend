@@ -1,0 +1,149 @@
+{
+  "info": {
+    "name": "Task Management API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Kumpulan request untuk menguji modul Task Management."
+  },
+  "item": [
+    {
+      "name": "Divisions",
+      "item": [
+        {
+          "name": "List Divisions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/divisions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "divisions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Division",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"QA\",\n  \"name\": \"Quality Assurance\",\n  \"description\": \"Menangani proses pengecekan kualitas deliverable.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/divisions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "divisions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Division",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA & Testing\",\n  \"description\": \"Mengatur proses QA dan pengujian internal.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/divisions/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "divisions",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Division",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/divisions/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "divisions",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Count Users in Division",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/divisions/1/users-count",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "divisions",
+                "1",
+                "users-count"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
