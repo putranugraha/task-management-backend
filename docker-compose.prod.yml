@@ -1,0 +1,57 @@
+services:
+  backend-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: backend-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - backend-storage:/var/www/html/storage
+    networks:
+      - backend-network
+    depends_on:
+      backend-db:
+        condition: service_healthy
+
+  backend-nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nginx
+    container_name: backend-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    networks:
+      - backend-network
+    depends_on:
+      - backend-app
+
+  backend-db:
+    image: postgres:17
+    container_name: backend-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - backend-pgsql:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  backend-network:
+    driver: bridge
+
+volumes:
+  backend-pgsql:
+  backend-storage:
