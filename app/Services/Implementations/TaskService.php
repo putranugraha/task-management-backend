@@ -678,6 +678,14 @@ class TaskService implements TaskServiceInterface
 
             $activity->log('status_changed');
 
+            if (($before->status ?? null) !== ($task->status ?? null)) {
+                $this->notifyTaskWatchers($task, 'task_status_changed', [
+                    'status_before' => $before->status ?? null,
+                    'status_after' => $task->status,
+                    'message' => 'Status task '.$task->title.' berubah dari '.($before->status ?? '-').' menjadi '.$task->status.'.',
+                ]);
+            }
+
             $this->syncMilestoneCompletion($task);
         }
         return $task;
@@ -744,6 +752,14 @@ class TaskService implements TaskServiceInterface
             }
 
             $activity->log('progress_updated');
+
+            if ($before && $beforePct !== $afterPct) {
+                $this->notifyTaskWatchers($task, 'task_progress_updated', [
+                    'percent_before' => $beforePct,
+                    'percent_after' => $afterPct,
+                    'message' => 'Progress task '.$task->title.' berubah dari '.$beforePct.'% menjadi '.$afterPct.'%.',
+                ]);
+            }
         }
 
         return $task;
@@ -793,6 +809,16 @@ class TaskService implements TaskServiceInterface
             }
 
             $activity->log('completed');
+
+            if (($before->status ?? null) !== ($task->status ?? null)) {
+                $this->notifyTaskWatchers($task, 'task_status_changed', [
+                    'status_before' => $before->status ?? null,
+                    'status_after' => $task->status,
+                    'percent_before' => $before->percent_complete ?? null,
+                    'percent_after' => $task->percent_complete,
+                    'message' => 'Task '.$task->title.' sudah diselesaikan.',
+                ]);
+            }
 
             $this->syncMilestoneCompletion($task);
         }
@@ -1258,6 +1284,54 @@ class TaskService implements TaskServiceInterface
             ];
 
             $assignee->notify(new TaskActivityNotification('task_assigned', $payload));
+        }
+    }
+
+    /**
+     * Kirim notifikasi task update ke assignee dan admin, tanpa mengirim balik ke actor.
+     *
+     * @param array<string,mixed> $extraPayload
+     */
+    protected function notifyTaskWatchers(Task $task, string $eventType, array $extraPayload = []): void
+    {
+        $actor = Auth::user();
+        $task->loadMissing('assignments.user');
+
+        $recipients = collect();
+
+        foreach ($task->assignments as $assignment) {
+            $assignee = $assignment->relationLoaded('user') ? $assignment->user : null;
+            if ($assignee instanceof User) {
+                $recipients->push($assignee);
+            }
+        }
+
+        $admins = User::query()
+            ->where('status', 'Aktif')
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['Admin', 'Super Admin']))
+            ->get();
+
+        $recipients = $recipients
+            ->merge($admins)
+            ->filter(fn ($user) => $user instanceof User)
+            ->unique('id')
+            ->values();
+
+        foreach ($recipients as $recipient) {
+            if ($actor && (int) $recipient->id === (int) $actor->id) {
+                continue;
+            }
+
+            $payload = array_merge([
+                'task_id' => $task->id,
+                'task_title' => $task->title,
+                'entity_type' => 'Task',
+                'entity_id' => $task->id,
+                'actor_id' => $actor?->id,
+                'actor_name' => $actor?->name,
+            ], $extraPayload);
+
+            $recipient->notify(new TaskActivityNotification($eventType, $payload));
         }
     }
 

@@ -41,6 +41,11 @@ class NotificationController extends Controller
                 'comment_id' => $payload['comment_id'] ?? null,
                 'actor_id' => $payload['actor_id'] ?? null,
                 'actor_name' => $payload['actor_name'] ?? null,
+                'status_before' => $payload['status_before'] ?? null,
+                'status_after' => $payload['status_after'] ?? null,
+                'percent_before' => $payload['percent_before'] ?? null,
+                'percent_after' => $payload['percent_after'] ?? null,
+                'due_date' => $payload['due_date'] ?? null,
                 'read_at' => optional($notification->read_at)?->toIso8601String(),
                 'created_at' => optional($notification->created_at)?->toIso8601String(),
             ];
@@ -75,4 +80,3 @@ class NotificationController extends Controller
         return response()->json(['message' => 'Notifikasi ditandai sebagai dibaca']);
     }
 }
-
