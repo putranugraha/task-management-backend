@@ -33,52 +33,56 @@ class DemoProjectManagementSeeder extends Seeder
 
     public function run(): void
     {
-        $this->today = Carbon::create(2026, 5, 10);
+        // Demo position for thesis presentation: active projects with healthy KPI/EVM through mid June.
+        $this->today = Carbon::create(2026, 6, 16);
 
         DB::transaction(function () {
             if (Role::whereIn('name', ['Admin', 'Manager', 'Member'])->count() < 3) {
                 $this->call(RolePermissionSeeder::class);
             }
 
+            $this->call(MemberSeeder::class);
             $this->prepareUsers();
             $this->resetDemoProjects();
 
-            $this->seedProject([
+            foreach ($this->projectData() as $projectData) {
+                $this->seedProject($projectData);
+            }
+        });
+    }
+
+    private function projectData(): array
+    {
+        return [
+            [
                 'name' => 'Website Trip Tirta Yatra Margi Nusa Penida',
                 'client_name' => 'Margi Nusa Penida',
-                'value_amount' => 13000000,
-                'start' => '2026-04-07',
-                'end' => '2026-07-07',
+                'value_amount' => 13200000,
+                'start' => '2026-05-13',
+                'end' => '2026-06-23',
                 'scope' => 'Website trip tirta yatra Bali dan Nusa Penida dengan katalog paket, itinerary, galeri destinasi, artikel ringan, dan form inquiry WhatsApp.',
                 'objective' => 'Meningkatkan kepercayaan calon pemesan dan membuat alur konsultasi paket tirta yatra lebih cepat.',
-                'costs' => [
-                    ['task' => 'Discovery kebutuhan paket tirta yatra', 'incurred_on' => '2026-04-08', 'amount' => 650000, 'category' => 'Discovery', 'note' => 'Meeting awal, dokumentasi kebutuhan, dan notulen paket tirta yatra.'],
-                    ['task' => 'Survey konten dan referensi destinasi Nusa Penida', 'incurred_on' => '2026-04-11', 'amount' => 1200000, 'category' => 'Content', 'note' => 'Transport dan konsumsi survey konten destinasi.'],
-                    ['task' => 'Sitemap dan struktur halaman website trip', 'incurred_on' => '2026-04-15', 'amount' => 500000, 'category' => 'Planning', 'note' => 'Penyusunan sitemap dan user flow inquiry.'],
-                    ['task' => 'Desain UI homepage Margi Nusa Penida', 'incurred_on' => '2026-04-23', 'amount' => 1700000, 'category' => 'Design', 'note' => 'Desain hero, paket unggulan, itinerary ringkas, dan CTA WhatsApp.'],
-                    ['task' => 'Implementasi frontend homepage dan layout utama', 'incurred_on' => '2026-05-03', 'amount' => 1900000, 'category' => 'Development', 'note' => 'Layout utama, navbar, footer, dan section paket.'],
-                    ['task' => 'Setup hosting, domain, dan staging awal', 'incurred_on' => '2026-05-06', 'amount' => 600000, 'category' => 'Infrastructure', 'note' => 'Domain, DNS, dan staging preview untuk review klien.'],
-                ],
+                'snapshot_dates' => ['2026-05-26', '2026-06-02', '2026-06-09', '2026-06-16'],
                 'milestones' => [
                     [
                         'name' => 'Discovery & Perencanaan',
-                        'due_planned' => '2026-04-18',
-                        'due_actual' => '2026-04-17',
+                        'due_planned' => '2026-05-20',
+                        'due_actual' => '2026-05-19',
                         'status' => 'Completed',
                         'tasks' => [
-                            ['key' => 'MNP-T01', 'title' => 'Discovery kebutuhan paket tirta yatra', 'priority' => 'High', 'status' => 'Done', 'start_planned' => '2026-04-07', 'end_planned' => '2026-04-09', 'start_actual' => '2026-04-07', 'end_actual' => '2026-04-09', 'percent' => 100, 'budget' => 700000, 'assignee' => 'admin'],
-                            ['key' => 'MNP-T02', 'title' => 'Survey konten dan referensi destinasi Nusa Penida', 'priority' => 'High', 'status' => 'Done', 'start_planned' => '2026-04-10', 'end_planned' => '2026-04-13', 'start_actual' => '2026-04-10', 'end_actual' => '2026-04-12', 'percent' => 100, 'budget' => 1100000, 'assignee' => 'gung_aria'],
-                            ['key' => 'MNP-T03', 'title' => 'Sitemap dan struktur halaman website trip', 'priority' => 'High', 'status' => 'Done', 'start_planned' => '2026-04-14', 'end_planned' => '2026-04-18', 'start_actual' => '2026-04-14', 'end_actual' => '2026-04-17', 'percent' => 100, 'budget' => 600000, 'assignee' => 'manager'],
+                            $this->task('MNP-T01', 'Discovery kebutuhan paket tirta yatra', 'High', '2026-05-13', '2026-05-15', 720000, 'gussastra', 24, ['2026-05-15' => 100], 0.95),
+                            $this->task('MNP-T02', 'Survey konten dan referensi destinasi Nusa Penida', 'High', '2026-05-15', '2026-05-18', 1200000, 'gungaria', 30, ['2026-05-18' => 100], 1.00),
+                            $this->task('MNP-T03', 'Sitemap dan struktur halaman website trip', 'High', '2026-05-17', '2026-05-20', 680000, 'wira', 28, ['2026-05-20' => 100], 0.92),
                         ],
                     ],
                     [
                         'name' => 'UI/UX Design',
-                        'due_planned' => '2026-04-30',
-                        'due_actual' => null,
-                        'status' => 'In Progress',
+                        'due_planned' => '2026-06-02',
+                        'due_actual' => '2026-06-02',
+                        'status' => 'Completed',
                         'tasks' => [
-                            ['key' => 'MNP-T04', 'title' => 'Desain UI homepage Margi Nusa Penida', 'priority' => 'High', 'status' => 'Done', 'start_planned' => '2026-04-19', 'end_planned' => '2026-04-23', 'start_actual' => '2026-04-19', 'end_actual' => '2026-04-24', 'percent' => 100, 'budget' => 1500000, 'assignee' => 'gung_aria'],
-                            ['key' => 'MNP-T05', 'title' => 'Desain halaman paket trip dan itinerary', 'priority' => 'High', 'status' => 'In Progress', 'start_planned' => '2026-04-24', 'end_planned' => '2026-04-30', 'start_actual' => '2026-04-25', 'end_actual' => null, 'percent' => 70, 'budget' => 1300000, 'assignee' => 'gung_aria'],
+                            $this->task('MNP-T04', 'Desain UI homepage Margi Nusa Penida', 'High', '2026-05-21', '2026-05-26', 1550000, 'gungaria', 42, ['2026-05-26' => 85, '2026-06-02' => 100], 0.98),
+                            $this->task('MNP-T05', 'Desain halaman paket trip dan itinerary', 'High', '2026-05-27', '2026-06-02', 1450000, 'gungindra', 46, ['2026-06-02' => 100], 1.01),
                         ],
                     ],
                     [
@@ -87,134 +91,182 @@ class DemoProjectManagementSeeder extends Seeder
                         'due_actual' => null,
                         'status' => 'In Progress',
                         'tasks' => [
-                            ['key' => 'MNP-T06', 'title' => 'Implementasi frontend homepage dan layout utama', 'priority' => 'High', 'status' => 'In Progress', 'start_planned' => '2026-05-01', 'end_planned' => '2026-05-09', 'start_actual' => '2026-05-01', 'end_actual' => null, 'percent' => 65, 'budget' => 2000000, 'assignee' => 'gustra'],
-                            ['key' => 'MNP-T07', 'title' => 'Implementasi halaman paket trip dan detail itinerary', 'priority' => 'High', 'status' => 'In Progress', 'start_planned' => '2026-05-08', 'end_planned' => '2026-05-20', 'start_actual' => '2026-05-09', 'end_actual' => null, 'percent' => 20, 'budget' => 1600000, 'assignee' => 'gustra'],
-                            ['key' => 'MNP-T08', 'title' => 'Integrasi form inquiry WhatsApp dan tracking sumber lead', 'priority' => 'Medium', 'status' => 'To Do', 'start_planned' => '2026-05-18', 'end_planned' => '2026-05-25', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 800000, 'assignee' => 'dwiki'],
-                            ['key' => 'MNP-T09', 'title' => 'Setup galeri destinasi dan optimasi gambar', 'priority' => 'Medium', 'status' => 'To Do', 'start_planned' => '2026-05-22', 'end_planned' => '2026-05-31', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 700000, 'assignee' => 'dwiki'],
-                            ['key' => 'MNP-T10', 'title' => 'Setup hosting, domain, dan staging awal', 'priority' => 'Medium', 'status' => 'Done', 'start_planned' => '2026-05-04', 'end_planned' => '2026-05-07', 'start_actual' => '2026-05-04', 'end_actual' => '2026-05-06', 'percent' => 100, 'budget' => 600000, 'assignee' => 'admin'],
+                            $this->task('MNP-T06', 'Implementasi frontend homepage dan layout utama', 'High', '2026-06-01', '2026-06-07', 2100000, 'gustra', 54, ['2026-06-02' => 25, '2026-06-09' => 100], 1.02),
+                            $this->task('MNP-T07', 'Implementasi halaman paket trip dan detail itinerary', 'High', '2026-06-04', '2026-06-18', 1800000, 'krisna', 58, ['2026-06-09' => 55, '2026-06-16' => 92], 0.96),
+                            $this->task('MNP-T08', 'Integrasi form inquiry WhatsApp dan tracking sumber lead', 'Medium', '2026-06-10', '2026-06-17', 900000, 'mahen', 36, ['2026-06-16' => 68], 0.94),
+                            $this->task('MNP-T09', 'Setup galeri destinasi dan optimasi gambar', 'Medium', '2026-06-12', '2026-06-19', 780000, 'dwiki', 34, ['2026-06-16' => 45], 0.97),
+                            $this->task('MNP-T10', 'Setup hosting, domain, dan staging awal', 'Medium', '2026-06-03', '2026-06-06', 620000, 'wisnu', 22, ['2026-06-09' => 100], 1.04),
                         ],
                     ],
                     [
                         'name' => 'Testing & Go Live',
-                        'due_planned' => '2026-07-07',
+                        'due_planned' => '2026-06-23',
                         'due_actual' => null,
                         'status' => 'Planned',
                         'tasks' => [
-                            ['key' => 'MNP-T11', 'title' => 'Testing responsive mobile dan browser utama', 'priority' => 'Medium', 'status' => 'To Do', 'start_planned' => '2026-06-17', 'end_planned' => '2026-06-25', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 600000, 'assignee' => 'manager'],
-                            ['key' => 'MNP-T12', 'title' => 'Final deployment dan handover admin', 'priority' => 'High', 'status' => 'To Do', 'start_planned' => '2026-06-26', 'end_planned' => '2026-07-07', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 1500000, 'assignee' => 'admin'],
+                            $this->task('MNP-T11', 'Testing responsive mobile dan browser utama', 'Medium', '2026-06-17', '2026-06-20', 650000, 'divo', 28, [], 1.00),
+                            $this->task('MNP-T12', 'Final deployment dan handover admin', 'High', '2026-06-21', '2026-06-23', 1500000, 'madeadi', 24, [], 1.00),
                         ],
                     ],
                 ],
                 'dependencies' => [
-                    ['task' => 'MNP-T02', 'depends_on' => 'MNP-T01', 'type' => 'FS', 'lag' => 1],
-                    ['task' => 'MNP-T03', 'depends_on' => 'MNP-T01', 'type' => 'SS', 'lag' => 2],
+                    ['task' => 'MNP-T02', 'depends_on' => 'MNP-T01', 'type' => 'FS', 'lag' => 0],
+                    ['task' => 'MNP-T03', 'depends_on' => 'MNP-T01', 'type' => 'SS', 'lag' => 1],
                     ['task' => 'MNP-T04', 'depends_on' => 'MNP-T03', 'type' => 'FS', 'lag' => 1],
-                    ['task' => 'MNP-T05', 'depends_on' => 'MNP-T04', 'type' => 'SS', 'lag' => 2],
+                    ['task' => 'MNP-T05', 'depends_on' => 'MNP-T04', 'type' => 'FS', 'lag' => 1],
                     ['task' => 'MNP-T06', 'depends_on' => 'MNP-T04', 'type' => 'FS', 'lag' => 1],
-                    ['task' => 'MNP-T07', 'depends_on' => 'MNP-T05', 'type' => 'SS', 'lag' => 3],
-                    ['task' => 'MNP-T08', 'depends_on' => 'MNP-T07', 'type' => 'FS', 'lag' => 1],
-                    ['task' => 'MNP-T09', 'depends_on' => 'MNP-T07', 'type' => 'FF', 'lag' => 2],
-                    ['task' => 'MNP-T12', 'depends_on' => 'MNP-T11', 'type' => 'SF', 'lag' => 0],
+                    ['task' => 'MNP-T07', 'depends_on' => 'MNP-T05', 'type' => 'SS', 'lag' => 2],
+                    ['task' => 'MNP-T08', 'depends_on' => 'MNP-T07', 'type' => 'SS', 'lag' => 3],
+                    ['task' => 'MNP-T09', 'depends_on' => 'MNP-T07', 'type' => 'SS', 'lag' => 4],
+                    ['task' => 'MNP-T11', 'depends_on' => 'MNP-T08', 'type' => 'FS', 'lag' => 0],
+                    ['task' => 'MNP-T12', 'depends_on' => 'MNP-T11', 'type' => 'FS', 'lag' => 0],
                 ],
                 'comments' => [
-                    'Konten utama sudah masuk dari klien, foto pura dan itinerary masih menunggu kurasi final.',
-                    'Prioritas minggu ini adalah menyelesaikan halaman paket dan CTA WhatsApp.',
+                    'Progress masih sesuai rencana. Fokus pekan ini menyelesaikan detail paket, integrasi inquiry, dan galeri destinasi.',
+                    'Risiko utama ada pada finalisasi konten itinerary, tetapi jadwal go live akhir Juni masih aman.',
                 ],
-            ]);
-
-            $this->seedProject([
+            ],
+            [
                 'name' => 'Website Supplier MBG Sumber Wangi',
                 'client_name' => 'Supplier MBG Sumber Wangi',
-                'value_amount' => 16000000,
-                'start' => '2026-04-23',
-                'end' => '2026-07-23',
+                'value_amount' => 16500000,
+                'start' => '2026-05-19',
+                'end' => '2026-06-30',
                 'scope' => 'Website profil dapur dan supplier MBG dengan informasi kapasitas produksi, menu, fasilitas dapur, standar kebersihan, dokumentasi legal, dan form kerja sama.',
-                'objective' => 'Membuat profil digital yang kredibel untuk kebutuhan presentasi supplier MBG dan komunikasi kerja sama dengan sekolah/mitra.',
-                'costs' => [
-                    ['task' => 'Mapping proses dapur MBG dan kebutuhan stakeholder', 'incurred_on' => '2026-04-24', 'amount' => 850000, 'category' => 'Discovery', 'note' => 'Interview operasional dan rangkuman kebutuhan website supplier.'],
-                    ['task' => 'Pendataan kapasitas produksi dan alur distribusi', 'incurred_on' => '2026-04-28', 'amount' => 700000, 'category' => 'Operation', 'note' => 'Pendataan kapasitas dapur, rute distribusi, dan jam produksi.'],
-                    ['task' => 'Dokumentasi foto dapur dan fasilitas produksi', 'incurred_on' => '2026-05-02', 'amount' => 1400000, 'category' => 'Content', 'note' => 'Foto area persiapan, penyimpanan, packing, dan armada.'],
-                    ['task' => 'Desain UI homepage Supplier MBG Sumber Wangi', 'incurred_on' => '2026-05-06', 'amount' => 1500000, 'category' => 'Design', 'note' => 'Desain homepage, fasilitas dapur, dan CTA kerja sama.'],
-                    ['task' => 'Setup staging dan struktur repository', 'incurred_on' => '2026-05-08', 'amount' => 600000, 'category' => 'Infrastructure', 'note' => 'Repository, environment staging, dan deploy preview awal.'],
-                ],
+                'objective' => 'Membuat profil digital yang kredibel untuk presentasi supplier MBG dan komunikasi kerja sama dengan sekolah atau mitra.',
+                'snapshot_dates' => ['2026-05-26', '2026-06-02', '2026-06-09', '2026-06-16'],
                 'milestones' => [
                     [
                         'name' => 'Requirement & Operational Mapping',
-                        'due_planned' => '2026-05-03',
-                        'due_actual' => '2026-05-03',
+                        'due_planned' => '2026-05-28',
+                        'due_actual' => '2026-05-28',
                         'status' => 'Completed',
                         'tasks' => [
-                            ['key' => 'MBG-T01', 'title' => 'Mapping proses dapur MBG dan kebutuhan stakeholder', 'priority' => 'High', 'status' => 'Done', 'start_planned' => '2026-04-23', 'end_planned' => '2026-04-26', 'start_actual' => '2026-04-23', 'end_actual' => '2026-04-26', 'percent' => 100, 'budget' => 900000, 'assignee' => 'admin'],
-                            ['key' => 'MBG-T02', 'title' => 'Pendataan kapasitas produksi dan alur distribusi', 'priority' => 'High', 'status' => 'Done', 'start_planned' => '2026-04-27', 'end_planned' => '2026-04-30', 'start_actual' => '2026-04-27', 'end_actual' => '2026-04-30', 'percent' => 100, 'budget' => 800000, 'assignee' => 'manager'],
-                            ['key' => 'MBG-T03', 'title' => 'Dokumentasi foto dapur dan fasilitas produksi', 'priority' => 'Medium', 'status' => 'Done', 'start_planned' => '2026-05-01', 'end_planned' => '2026-05-03', 'start_actual' => '2026-05-01', 'end_actual' => '2026-05-03', 'percent' => 100, 'budget' => 1400000, 'assignee' => 'gung_aria'],
+                            $this->task('MBG-T01', 'Mapping proses dapur MBG dan kebutuhan stakeholder', 'High', '2026-05-19', '2026-05-22', 900000, 'gussastra', 30, ['2026-05-22' => 100], 0.93),
+                            $this->task('MBG-T02', 'Pendataan kapasitas produksi dan alur distribusi', 'High', '2026-05-22', '2026-05-26', 850000, 'wira', 34, ['2026-05-26' => 100], 0.98),
+                            $this->task('MBG-T03', 'Dokumentasi foto dapur dan fasilitas produksi', 'Medium', '2026-05-25', '2026-05-28', 1450000, 'gungindra', 30, ['2026-05-26' => 55, '2026-06-02' => 100], 1.03),
                         ],
                     ],
                     [
                         'name' => 'Information Architecture & Design',
-                        'due_planned' => '2026-05-18',
+                        'due_planned' => '2026-06-10',
                         'due_actual' => null,
                         'status' => 'In Progress',
                         'tasks' => [
-                            ['key' => 'MBG-T04', 'title' => 'Rancang struktur halaman profil supplier MBG', 'priority' => 'High', 'status' => 'In Progress', 'start_planned' => '2026-05-04', 'end_planned' => '2026-05-07', 'start_actual' => '2026-05-04', 'end_actual' => null, 'percent' => 80, 'budget' => 800000, 'assignee' => 'manager'],
-                            ['key' => 'MBG-T05', 'title' => 'Desain UI homepage Supplier MBG Sumber Wangi', 'priority' => 'High', 'status' => 'In Progress', 'start_planned' => '2026-05-06', 'end_planned' => '2026-05-12', 'start_actual' => '2026-05-06', 'end_actual' => null, 'percent' => 55, 'budget' => 1700000, 'assignee' => 'gung_aria'],
-                            ['key' => 'MBG-T06', 'title' => 'Desain halaman menu mingguan dan standar gizi', 'priority' => 'Medium', 'status' => 'To Do', 'start_planned' => '2026-05-13', 'end_planned' => '2026-05-18', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 1100000, 'assignee' => 'gung_aria'],
+                            $this->task('MBG-T04', 'Rancang struktur halaman profil supplier MBG', 'High', '2026-05-29', '2026-06-03', 850000, 'wira', 36, ['2026-06-02' => 75, '2026-06-09' => 100], 0.97),
+                            $this->task('MBG-T05', 'Desain UI homepage Supplier MBG Sumber Wangi', 'High', '2026-06-02', '2026-06-09', 1750000, 'gungaria', 48, ['2026-06-09' => 85, '2026-06-16' => 100], 1.00),
+                            $this->task('MBG-T06', 'Desain halaman menu mingguan dan standar gizi', 'Medium', '2026-06-07', '2026-06-18', 1150000, 'mahen', 38, ['2026-06-09' => 35, '2026-06-16' => 82], 0.96),
                         ],
                     ],
                     [
                         'name' => 'Development Modul Profil & Menu',
                         'due_planned' => '2026-06-24',
                         'due_actual' => null,
-                        'status' => 'Planned',
+                        'status' => 'In Progress',
                         'tasks' => [
-                            ['key' => 'MBG-T07', 'title' => 'Setup staging dan struktur repository', 'priority' => 'Medium', 'status' => 'Done', 'start_planned' => '2026-05-07', 'end_planned' => '2026-05-09', 'start_actual' => '2026-05-07', 'end_actual' => '2026-05-08', 'percent' => 100, 'budget' => 600000, 'assignee' => 'admin'],
-                            ['key' => 'MBG-T08', 'title' => 'Implementasi halaman profil perusahaan dan fasilitas dapur', 'priority' => 'High', 'status' => 'To Do', 'start_planned' => '2026-05-19', 'end_planned' => '2026-06-02', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 2500000, 'assignee' => 'gustra'],
-                            ['key' => 'MBG-T09', 'title' => 'Implementasi katalog menu MBG dan kapasitas produksi', 'priority' => 'High', 'status' => 'To Do', 'start_planned' => '2026-06-03', 'end_planned' => '2026-06-14', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 2100000, 'assignee' => 'dwiki'],
-                            ['key' => 'MBG-T10', 'title' => 'Dokumentasi standar kebersihan dan legalitas dapur', 'priority' => 'Medium', 'status' => 'To Do', 'start_planned' => '2026-06-10', 'end_planned' => '2026-06-24', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 1300000, 'assignee' => 'manager'],
+                            $this->task('MBG-T07', 'Setup staging dan struktur repository', 'Medium', '2026-06-04', '2026-06-06', 650000, 'wisnu', 20, ['2026-06-09' => 100], 1.02),
+                            $this->task('MBG-T08', 'Implementasi halaman profil perusahaan dan fasilitas dapur', 'High', '2026-06-10', '2026-06-18', 2600000, 'gustra', 56, ['2026-06-16' => 62], 0.95),
+                            $this->task('MBG-T09', 'Implementasi katalog menu MBG dan kapasitas produksi', 'High', '2026-06-14', '2026-06-23', 2150000, 'dwiki', 54, ['2026-06-16' => 32], 0.94),
+                            $this->task('MBG-T10', 'Dokumentasi standar kebersihan dan legalitas dapur', 'Medium', '2026-06-16', '2026-06-24', 1350000, 'krisna', 42, ['2026-06-16' => 20], 0.96),
                         ],
                     ],
                     [
                         'name' => 'Testing & Deployment',
-                        'due_planned' => '2026-07-23',
+                        'due_planned' => '2026-06-30',
                         'due_actual' => null,
                         'status' => 'Planned',
                         'tasks' => [
-                            ['key' => 'MBG-T11', 'title' => 'Testing form kerja sama dan performa mobile', 'priority' => 'Medium', 'status' => 'To Do', 'start_planned' => '2026-06-25', 'end_planned' => '2026-07-07', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 900000, 'assignee' => 'manager'],
-                            ['key' => 'MBG-T12', 'title' => 'Final deployment dan training update konten MBG', 'priority' => 'High', 'status' => 'To Do', 'start_planned' => '2026-07-08', 'end_planned' => '2026-07-23', 'start_actual' => null, 'end_actual' => null, 'percent' => 0, 'budget' => 1900000, 'assignee' => 'admin'],
+                            $this->task('MBG-T11', 'Testing form kerja sama dan performa mobile', 'Medium', '2026-06-25', '2026-06-27', 950000, 'divo', 24, [], 1.00),
+                            $this->task('MBG-T12', 'Final deployment dan training update konten MBG', 'High', '2026-06-28', '2026-06-30', 1950000, 'madeadi', 24, [], 1.00),
                         ],
                     ],
                 ],
                 'dependencies' => [
                     ['task' => 'MBG-T02', 'depends_on' => 'MBG-T01', 'type' => 'FS', 'lag' => 0],
-                    ['task' => 'MBG-T03', 'depends_on' => 'MBG-T01', 'type' => 'SS', 'lag' => 1],
+                    ['task' => 'MBG-T03', 'depends_on' => 'MBG-T01', 'type' => 'SS', 'lag' => 2],
                     ['task' => 'MBG-T04', 'depends_on' => 'MBG-T02', 'type' => 'FS', 'lag' => 1],
                     ['task' => 'MBG-T05', 'depends_on' => 'MBG-T04', 'type' => 'SS', 'lag' => 2],
-                    ['task' => 'MBG-T06', 'depends_on' => 'MBG-T05', 'type' => 'FS', 'lag' => 1],
-                    ['task' => 'MBG-T08', 'depends_on' => 'MBG-T05', 'type' => 'FS', 'lag' => 3],
-                    ['task' => 'MBG-T09', 'depends_on' => 'MBG-T08', 'type' => 'FS', 'lag' => 1],
+                    ['task' => 'MBG-T06', 'depends_on' => 'MBG-T05', 'type' => 'SS', 'lag' => 3],
+                    ['task' => 'MBG-T08', 'depends_on' => 'MBG-T05', 'type' => 'FS', 'lag' => 1],
+                    ['task' => 'MBG-T09', 'depends_on' => 'MBG-T08', 'type' => 'SS', 'lag' => 3],
                     ['task' => 'MBG-T10', 'depends_on' => 'MBG-T08', 'type' => 'SS', 'lag' => 4],
-                    ['task' => 'MBG-T11', 'depends_on' => 'MBG-T10', 'type' => 'FF', 'lag' => 0],
-                    ['task' => 'MBG-T12', 'depends_on' => 'MBG-T11', 'type' => 'SF', 'lag' => 0],
+                    ['task' => 'MBG-T11', 'depends_on' => 'MBG-T10', 'type' => 'FS', 'lag' => 0],
+                    ['task' => 'MBG-T12', 'depends_on' => 'MBG-T11', 'type' => 'FS', 'lag' => 0],
                 ],
                 'comments' => [
-                    'Data kapasitas produksi sudah dikunci, menu mingguan masih menunggu validasi final dari pihak dapur.',
-                    'Perlu menonjolkan standar kebersihan dan alur distribusi karena ini jadi bahan kepercayaan calon mitra.',
+                    'Data operasional dan dokumentasi fasilitas sudah lengkap. Fokus berikutnya adalah implementasi halaman profil dan katalog menu.',
+                    'Project masih sehat untuk target akhir Juni, dengan prioritas menjaga kualitas konten dan performa mobile.',
                 ],
-            ]);
-        });
+            ],
+        ];
+    }
+
+    private function task(
+        string $key,
+        string $title,
+        string $priority,
+        string $start,
+        string $end,
+        int $budget,
+        string $assignee,
+        int $effort,
+        array $progress,
+        float $actualCostFactor
+    ): array {
+        $percent = empty($progress) ? 0 : (int) end($progress);
+        $startActual = empty($progress) ? null : (string) array_key_first($progress);
+        $endActual = $percent >= 100 ? (string) array_key_last($progress) : null;
+        $status = $percent >= 100 ? 'Done' : ($percent > 0 ? 'In Progress' : 'To Do');
+
+        return [
+            'key' => $key,
+            'title' => $title,
+            'priority' => $priority,
+            'status' => $status,
+            'start_planned' => $start,
+            'end_planned' => $end,
+            'start_actual' => $startActual,
+            'end_actual' => $endActual,
+            'percent' => $percent,
+            'budget' => $budget,
+            'assignee' => $assignee,
+            'estimated_effort_hours' => $effort,
+            'progress' => $progress,
+            'actual_cost_factor' => $actualCostFactor,
+        ];
     }
 
     private function prepareUsers(): void
     {
         $division = Division::updateOrCreate(
             ['code' => 'SW'],
-            ['name' => 'Software', 'description' => 'Tim software untuk UI/UX, frontend, backend, integrasi, QA, dan deployment website.', 'status' => 'Aktif']
+            [
+                'name' => 'Software',
+                'description' => 'Tim software untuk UI/UX, frontend, backend, integrasi, QA, dan deployment website.',
+                'status' => 'Aktif',
+            ]
         );
 
-        $this->users['admin'] = $this->user('Admin', 'admin@example.com', 'Administrator', $division->id, 'Admin');
-        $this->users['manager'] = $this->user('Ayu Pradnya', 'ayu.pm@example.com', 'Project Manager', $division->id, 'Manager');
-        $this->users['gustra'] = $this->user('Gustra', 'gustra.software@example.com', 'Software Engineer', $division->id, 'Member');
-        $this->users['gung_aria'] = $this->user('Gung Aria', 'gung.aria@example.com', 'UI/UX Designer', $division->id, 'Member');
-        $this->users['dwiki'] = $this->user('Dwiki', 'dwiki.software@example.com', 'Backend Developer', $division->id, 'Member');
+        $mapping = [
+            'gussastra' => ['Gus Sastra', 'gussastra@gmail.com', 'Administrator', 'Admin'],
+            'wira' => ['Wira', 'wira@gmail.com', 'Project Manager', 'Manager'],
+            'gungaria' => ['Gungaria', 'gungaria@gmail.com', 'UI/UX Designer', 'Member'],
+            'gungindra' => ['Gungindra', 'gungindra@gmail.com', 'Content Designer', 'Member'],
+            'krisna' => ['Krisna', 'krisna@gmail.com', 'Frontend Developer', 'Member'],
+            'mahen' => ['Mahen', 'mahen@gmail.com', 'Backend Developer', 'Member'],
+            'dwiki' => ['Dwiki', 'dwiki@gmail.com', 'Integration Developer', 'Member'],
+            'divo' => ['Divo', 'divo@gmail.com', 'QA Engineer', 'Member'],
+            'wisnu' => ['Wisnu', 'wisnu@gmail.com', 'DevOps Engineer', 'Member'],
+            'gustra' => ['Gustra', 'gustra@gmail.com', 'Fullstack Developer', 'Member'],
+            'madeadi' => ['Madeadi', 'madeadi@gmail.com', 'Documentation & Support', 'Member'],
+        ];
+
+        foreach ($mapping as $key => [$name, $email, $jobTitle, $role]) {
+            $this->users[$key] = $this->user($name, $email, $jobTitle, $division->id, $role);
+        }
+
+        $this->users['admin'] = $this->users['gussastra'];
+        $this->users['manager'] = $this->users['wira'];
         $this->users['member'] = $this->users['gustra'];
     }
 
@@ -346,22 +398,7 @@ class DemoProjectManagementSeeder extends Seeder
             ]);
         }
 
-        foreach ($data['costs'] as $cost) {
-            $task = collect($tasksByKey)->first(fn (Task $task) => $task->title === $cost['task']);
-            if (!$task) {
-                continue;
-            }
-
-            TaskCostEntry::create([
-                'task_id' => $task->id,
-                'incurred_on' => $cost['incurred_on'],
-                'amount' => $cost['amount'],
-                'category' => $cost['category'],
-                'note' => $cost['note'],
-            ]);
-        }
-
-        $this->seedProjectReporting($project, collect($tasksByKey)->values());
+        $this->seedProjectReporting($project, collect($tasksByKey)->values(), $data['snapshot_dates']);
         $this->seedProjectCommentsAndAttachments($project, $data['comments']);
     }
 
@@ -374,31 +411,30 @@ class DemoProjectManagementSeeder extends Seeder
             'task_id' => $task->id,
             'user_id' => $assignee->id,
             'role_on_task' => $this->taskRoleOnTask($assigneeKey),
-            'estimated_effort_hours' => max(4, ($task->duration_planned ?? 1) * 6),
+            'estimated_effort_hours' => $taskData['estimated_effort_hours'],
             'assigned_at' => Carbon::parse($taskData['start_planned'])->startOfDay(),
         ]);
 
         $this->notifyDemoAssignee($task, $assignee, $assignment->role_on_task ?: 'Member');
+        $this->seedStatusHistory($task, $taskData, $assignee);
+        $this->seedProgressEffortAndCost($task, $taskData, $assignee);
+    }
 
-        if ($taskData['start_actual']) {
-            StatusHistory::create([
-                'task_id' => $task->id,
-                'from_status' => 'To Do',
-                'to_status' => $taskData['status'] === 'Done' ? 'In Progress' : $taskData['status'],
-                'changed_by' => $assignee->id,
-                'note' => 'Task mulai dikerjakan sesuai update operasional.',
-                'created_at' => Carbon::parse($taskData['start_actual'])->setTime(9, 0),
-                'updated_at' => Carbon::parse($taskData['start_actual'])->setTime(9, 0),
-            ]);
-
-            TimeEntry::create([
-                'task_id' => $task->id,
-                'user_id' => $assignee->id,
-                'date' => $taskData['start_actual'],
-                'hours' => $taskData['status'] === 'Done' ? 6 : 4,
-                'note' => 'Pengerjaan awal dan update progress task.',
-            ]);
+    private function seedStatusHistory(Task $task, array $taskData, User $assignee): void
+    {
+        if (!$taskData['start_actual']) {
+            return;
         }
+
+        StatusHistory::create([
+            'task_id' => $task->id,
+            'from_status' => 'To Do',
+            'to_status' => $taskData['status'] === 'Done' ? 'In Progress' : $taskData['status'],
+            'changed_by' => $assignee->id,
+            'note' => 'Task mulai dikerjakan sesuai rencana demo project.',
+            'created_at' => Carbon::parse($taskData['start_actual'])->setTime(9, 0),
+            'updated_at' => Carbon::parse($taskData['start_actual'])->setTime(9, 0),
+        ]);
 
         if ($taskData['status'] === 'Done' && $taskData['end_actual']) {
             StatusHistory::create([
@@ -410,35 +446,86 @@ class DemoProjectManagementSeeder extends Seeder
                 'created_at' => Carbon::parse($taskData['end_actual'])->setTime(16, 30),
                 'updated_at' => Carbon::parse($taskData['end_actual'])->setTime(16, 30),
             ]);
+        }
+    }
 
-            if ($taskData['end_actual'] !== $taskData['start_actual']) {
+    private function seedProgressEffortAndCost(Task $task, array $taskData, User $assignee): void
+    {
+        $previousPercent = 0;
+        $progress = $taskData['progress'];
+
+        if (empty($progress)) {
+            TaskProgressEntry::create([
+                'task_id' => $task->id,
+                'progress_date' => $this->today->toDateString(),
+                'percent_complete' => 0,
+                'changed_by' => $assignee->id,
+            ]);
+
+            return;
+        }
+
+        foreach ($progress as $date => $percent) {
+            $percent = (int) $percent;
+            $delta = max(0, $percent - $previousPercent);
+            $effortHours = round(((float) $taskData['estimated_effort_hours']) * ($delta / 100) * 0.98, 2);
+            $costAmount = round(((float) $taskData['budget']) * ($delta / 100) * (float) $taskData['actual_cost_factor'], 2);
+
+            TaskProgressEntry::create([
+                'task_id' => $task->id,
+                'progress_date' => $date,
+                'percent_complete' => $percent,
+                'changed_by' => $assignee->id,
+            ]);
+
+            if ($delta > 0) {
                 TimeEntry::create([
                     'task_id' => $task->id,
                     'user_id' => $assignee->id,
-                    'date' => $taskData['end_actual'],
-                    'hours' => 5,
-                    'note' => 'Finalisasi dan penyesuaian hasil review.',
+                    'date' => $date,
+                    'hours' => max(1, $effortHours),
+                    'note' => 'Update progress demo: '.$previousPercent.'% ke '.$percent.'%.',
+                ]);
+
+                TaskCostEntry::create([
+                    'task_id' => $task->id,
+                    'incurred_on' => $date,
+                    'amount' => max(100000, $costAmount),
+                    'category' => $this->costCategory($assignee),
+                    'note' => 'Biaya operasional sesuai kenaikan progress demo.',
                 ]);
             }
-        }
 
-        TaskProgressEntry::create([
-            'task_id' => $task->id,
-            'progress_date' => $taskData['end_actual'] ?? ($taskData['start_actual'] ?? $this->today->toDateString()),
-            'percent_complete' => $taskData['percent'],
-            'changed_by' => $assignee->id,
-        ]);
+            $previousPercent = $percent;
+        }
     }
 
     private function taskRoleOnTask(string $assigneeKey): string
     {
         return match ($assigneeKey) {
-            'admin' => 'Project Owner',
-            'manager' => 'Project Manager',
-            'gung_aria' => 'UI/UX Designer',
-            'dwiki' => 'Backend Developer',
-            'gustra' => 'Software Engineer',
-            default => 'Developer',
+            'gussastra', 'admin' => 'Project Owner',
+            'wira', 'manager' => 'Project Manager',
+            'gungaria' => 'UI/UX Designer',
+            'gungindra' => 'Content Designer',
+            'krisna' => 'Frontend Developer',
+            'mahen' => 'Backend Developer',
+            'dwiki' => 'Integration Developer',
+            'divo' => 'QA Engineer',
+            'wisnu' => 'DevOps Engineer',
+            'gustra' => 'Fullstack Developer',
+            'madeadi' => 'Documentation & Support',
+            default => 'Team Member',
+        };
+    }
+
+    private function costCategory(User $user): string
+    {
+        return match ($user->job_title) {
+            'UI/UX Designer', 'Content Designer' => 'Design',
+            'Backend Developer', 'Frontend Developer', 'Integration Developer', 'Fullstack Developer' => 'Development',
+            'QA Engineer' => 'Quality Assurance',
+            'DevOps Engineer' => 'Infrastructure',
+            default => 'Project Operation',
         };
     }
 
@@ -456,8 +543,6 @@ class DemoProjectManagementSeeder extends Seeder
     }
 
     /**
-     * Remove stale notifications from previous demo task ids before reseeding.
-     *
      * @param array<int> $taskIds
      */
     private function deleteDemoTaskNotifications(array $taskIds): void
@@ -476,7 +561,7 @@ class DemoProjectManagementSeeder extends Seeder
             });
     }
 
-    private function seedProjectReporting(Project $project, $tasks): void
+    private function seedProjectReporting(Project $project, $tasks, array $snapshotDates): void
     {
         $baseline = ProjectBaseline::create([
             'project_id' => $project->id,
@@ -489,6 +574,8 @@ class DemoProjectManagementSeeder extends Seeder
 
         $weight = round(100 / max(1, $tasks->count()), 2);
         foreach ($tasks as $task) {
+            $assignmentEffort = (float) TaskAssignment::where('task_id', $task->id)->sum('estimated_effort_hours');
+
             TaskBaseline::create([
                 'baseline_id' => $baseline->id,
                 'task_id' => $task->id,
@@ -496,31 +583,46 @@ class DemoProjectManagementSeeder extends Seeder
                 'end_planned_base' => $task->end_planned,
                 'duration_planned_base' => $task->duration_planned,
                 'weight' => $weight,
-                'planned_effort_hours' => max(4, ($task->duration_planned ?? 1) * 6),
+                'planned_effort_hours' => $assignmentEffort,
+                'budget_cost_base' => $task->budget_cost,
             ]);
         }
 
-        foreach ([Carbon::parse($project->start_planned)->addDays(7), $this->today] as $date) {
+        foreach ($snapshotDates as $date) {
+            $date = Carbon::parse($date);
             $period = ReportingPeriod::create([
                 'project_id' => $project->id,
                 'period_date' => $date->toDateString(),
                 'note' => 'Snapshot progress demo sampai '.$date->translatedFormat('d F Y').'.',
             ]);
 
-            $doneTasks = $tasks->where('status', 'Done');
+            $asOfEnd = $date->copy()->endOfDay();
+            $doneTasks = $tasks->filter(function (Task $task) use ($asOfEnd) {
+                return $task->end_actual && Carbon::parse($task->end_actual)->endOfDay()->lessThanOrEqualTo($asOfEnd);
+            });
+
             KpiSnapshot::create([
                 'project_id' => $project->id,
                 'period_id' => $period->id,
                 'tasks_total' => $tasks->count(),
                 'tasks_done' => $doneTasks->count(),
                 'overdue_count' => $tasks
-                    ->filter(fn (Task $task) => $task->end_planned && Carbon::parse($task->end_planned)->lt($date) && $task->status !== 'Done')
+                    ->filter(fn (Task $task) => $this->isOverdueAsOf($task, $date))
                     ->count(),
                 'avg_cycle_time_days' => $doneTasks
                     ->filter(fn (Task $task) => $task->start_actual && $task->end_actual)
                     ->avg(fn (Task $task) => $this->duration($task->start_actual, $task->end_actual)) ?? 0,
             ]);
         }
+    }
+
+    private function isOverdueAsOf(Task $task, Carbon $date): bool
+    {
+        if (!$task->end_planned || !Carbon::parse($task->end_planned)->lt($date)) {
+            return false;
+        }
+
+        return !$task->end_actual || Carbon::parse($task->end_actual)->gt($date);
     }
 
     private function seedProjectCommentsAndAttachments(Project $project, array $comments): void
