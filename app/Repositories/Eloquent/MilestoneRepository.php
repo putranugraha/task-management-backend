@@ -23,13 +23,13 @@ class MilestoneRepository implements MilestoneRepositoryInterface
 
     public function getAllMilestones()
     {
-        return $this->model->with('project')->get();
+        return $this->activeQuery()->with('project')->get();
     }
 
     public function getMilestoneById($id)
     {
         try {
-            return $this->model->with('project')->findOrFail($id);
+            return $this->activeQuery()->with('project')->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("Milestone with ID {$id} not found.");
             return null;
@@ -38,17 +38,17 @@ class MilestoneRepository implements MilestoneRepositoryInterface
 
     public function getMilestonesByProject($projectId)
     {
-        return $this->model->where('project_id', $projectId)->with('project')->get();
+        return $this->activeQuery()->where('project_id', $projectId)->with('project')->get();
     }
 
     public function getMilestonesByStatus($status)
     {
-        return $this->model->where('status', $status)->with('project')->get();
+        return $this->activeQuery()->where('status', $status)->with('project')->get();
     }
 
     public function getMilestonesByDateRange($startDate, $endDate)
     {
-        return $this->model
+        return $this->activeQuery()
             ->whereDate('due_planned', '>=', $startDate)
             ->whereDate('due_planned', '<=', $endDate)
             ->with('project')
@@ -97,6 +97,7 @@ class MilestoneRepository implements MilestoneRepositoryInterface
     {
         $query = $this->model
             ->onlyTrashed()
+            ->whereHas('project')
             ->with('project');
 
         $this->applyFilters($query, $filters);
@@ -110,6 +111,7 @@ class MilestoneRepository implements MilestoneRepositoryInterface
     {
         $milestone = $this->model->onlyTrashed()->find($id);
         if (!$milestone) return null;
+        if (!Project::query()->whereKey($milestone->project_id)->exists()) return null;
 
         try {
             $milestone->restore();
@@ -156,7 +158,7 @@ class MilestoneRepository implements MilestoneRepositoryInterface
 
     public function paginateMilestones(array $filters = [], int $perPage = 20)
     {
-        $query = $this->model->with('project');
+        $query = $this->activeQuery()->with('project');
 
         $this->applyFilters($query, $filters);
 
@@ -171,7 +173,7 @@ class MilestoneRepository implements MilestoneRepositoryInterface
      */
     public function getMilestoneStatusCounts(array $filters = []): array
     {
-        $baseQuery = $this->model->newQuery();
+        $baseQuery = $this->activeQuery();
 
         if (isset($filters['project_id'])) {
             $baseQuery->where('project_id', $filters['project_id']);
@@ -209,11 +211,16 @@ class MilestoneRepository implements MilestoneRepositoryInterface
     protected function find($id)
     {
         try {
-            return $this->model->findOrFail($id);
+            return $this->activeQuery()->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("Milestone with ID {$id} not found.");
             return null;
         }
+    }
+
+    protected function activeQuery()
+    {
+        return $this->model->newQuery()->whereHas('project');
     }
 
     protected function applyFilters($query, array $filters): void

@@ -126,6 +126,18 @@ class KpiSnapshotService implements KpiSnapshotServiceInterface
                 $query->whereNull('deleted_at')
                     ->orWhere('deleted_at', '>', $asOfEnd);
             })
+            ->where(function ($query) use ($asOfEnd) {
+                $query->whereNull('milestone_id')
+                    ->orWhereHas('milestone', function ($milestoneQuery) use ($asOfEnd) {
+                        $milestoneQuery
+                            ->withTrashed()
+                            ->where('created_at', '<=', $asOfEnd)
+                            ->where(function ($archiveQuery) use ($asOfEnd) {
+                                $archiveQuery->whereNull('deleted_at')
+                                    ->orWhere('deleted_at', '>', $asOfEnd);
+                            });
+                    });
+            })
             ->get();
         $tasksTotal = $tasks->count();
         $taskIds = $tasks->pluck('id')->all();

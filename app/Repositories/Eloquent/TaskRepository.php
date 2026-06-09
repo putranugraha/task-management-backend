@@ -25,13 +25,13 @@ class TaskRepository implements TaskRepositoryInterface
 
     public function getAllTasks()
     {
-        return $this->model->with(['project', 'milestone'])->get();
+        return $this->activeQuery()->with(['project', 'milestone'])->get();
     }
 
     public function getTaskById($id)
     {
         try {
-            return $this->model->with(['project', 'milestone', 'assignments.user', 'dependencies.dependsOn'])->findOrFail($id);
+            return $this->activeQuery()->with(['project', 'milestone', 'assignments.user', 'dependencies.dependsOn'])->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("Task with ID {$id} not found.");
             return null;
@@ -40,28 +40,28 @@ class TaskRepository implements TaskRepositoryInterface
 
     public function getTasksByProject($projectId)
     {
-        return $this->model->where('project_id', $projectId)->with(['project', 'milestone'])->get();
+        return $this->activeQuery()->where('project_id', $projectId)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByMilestone($milestoneId)
     {
-        return $this->model->where('milestone_id', $milestoneId)->with(['project', 'milestone'])->get();
+        return $this->activeQuery()->where('milestone_id', $milestoneId)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByStatus($status)
     {
-        return $this->model->where('status', $status)->with(['project', 'milestone'])->get();
+        return $this->activeQuery()->where('status', $status)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByPriority($priority)
     {
-        return $this->model->where('priority', $priority)->with(['project', 'milestone'])->get();
+        return $this->activeQuery()->where('priority', $priority)->with(['project', 'milestone'])->get();
     }
 
     public function getTasksByPlannedDateRange($startDate, $endDate)
     {
         // Jatuh tempo planned: gunakan end_planned berada di antara range
-        return $this->model
+        return $this->activeQuery()
             ->whereNotNull('end_planned')
             ->whereDate('end_planned', '>=', $startDate)
             ->whereDate('end_planned', '<=', $endDate)
@@ -72,7 +72,7 @@ class TaskRepository implements TaskRepositoryInterface
     public function getTasksByActualDateRange($startDate, $endDate)
     {
         // Selesai di rentang actual: gunakan end_actual berada di antara range
-        return $this->model
+        return $this->activeQuery()
             ->whereNotNull('end_actual')
             ->whereDate('end_actual', '>=', $startDate)
             ->whereDate('end_actual', '<=', $endDate)
@@ -133,6 +133,11 @@ class TaskRepository implements TaskRepositoryInterface
     {
         $query = $this->model
             ->onlyTrashed()
+            ->whereHas('project')
+            ->where(function ($query) {
+                $query->whereNull('milestone_id')
+                    ->orWhereHas('milestone');
+            })
             ->with(['project', 'milestone']);
 
         $this->applyFilters($query, $filters);
@@ -146,6 +151,8 @@ class TaskRepository implements TaskRepositoryInterface
     {
         $task = $this->model->onlyTrashed()->find($id);
         if (!$task) return null;
+        if (!Project::query()->whereKey($task->project_id)->exists()) return null;
+        if ($task->milestone_id && !Milestone::query()->whereKey($task->milestone_id)->exists()) return null;
 
         try {
             $task->restore();
@@ -197,7 +204,7 @@ class TaskRepository implements TaskRepositoryInterface
 
     public function getTasksByDependsOnTask($dependsOnTaskId)
     {
-        return $this->model
+        return $this->activeQuery()
             ->whereHas('dependencies', function ($q) use ($dependsOnTaskId) {
                 $q->where('depends_on_task_id', $dependsOnTaskId);
             })
@@ -207,7 +214,7 @@ class TaskRepository implements TaskRepositoryInterface
 
     public function paginateTasks(array $filters = [], int $perPage = 20)
     {
-        $query = $this->model->with(['project', 'milestone']);
+        $query = $this->activeQuery()->with(['project', 'milestone']);
 
         $this->applyFilters($query, $filters);
 
@@ -228,7 +235,7 @@ class TaskRepository implements TaskRepositoryInterface
         $cacheKey = 'tasks:status-counts:' . md5(json_encode($normalizedFilters));
 
         return Cache::remember($cacheKey, self::STATS_CACHE_TTL_SECONDS, function () use ($normalizedFilters) {
-            $baseQuery = $this->model->newQuery();
+            $baseQuery = $this->activeQuery();
 
             if (isset($normalizedFilters['project_id'])) {
                 $baseQuery->where('project_id', $normalizedFilters['project_id']);
@@ -322,11 +329,21 @@ class TaskRepository implements TaskRepositoryInterface
     protected function find($id)
     {
         try {
-            return $this->model->findOrFail($id);
+            return $this->activeQuery()->findOrFail($id);
         } catch (ModelNotFoundException $e) {
             Log::error("Task with ID {$id} not found.");
             return null;
         }
+    }
+
+    protected function activeQuery()
+    {
+        return $this->model->newQuery()
+            ->whereHas('project')
+            ->where(function ($query) {
+                $query->whereNull('milestone_id')
+                    ->orWhereHas('milestone');
+            });
     }
 
     protected function updateProjectCompletionIfDone(?int $projectId): void

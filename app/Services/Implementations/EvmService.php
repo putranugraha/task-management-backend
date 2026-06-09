@@ -50,6 +50,10 @@ class EvmService implements EvmServiceInterface
         // Fetch tasks for project (minimal columns)
         $tasks = Task::query()
             ->where('project_id', $projectId)
+            ->where(function ($query) {
+                $query->whereNull('milestone_id')
+                    ->orWhereHas('milestone');
+            })
             ->get([
                 'id', 'project_id', 'start_planned', 'end_planned', 'duration_planned', 'percent_complete',
             ]);

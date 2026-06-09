@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ProjectRepository implements ProjectRepositoryInterface
 {
@@ -160,7 +161,7 @@ class ProjectRepository implements ProjectRepositoryInterface
         }
 
         try {
-            DB::transaction(function () use ($project) {
+            $attachmentPaths = DB::transaction(function () use ($project) {
                 $taskIds = Task::withTrashed()
                     ->where('project_id', $project->id)
                     ->pluck('id');
@@ -168,6 +169,37 @@ class ProjectRepository implements ProjectRepositoryInterface
                 $milestoneIds = Milestone::withTrashed()
                     ->where('project_id', $project->id)
                     ->pluck('id');
+
+                $attachmentPaths = Attachment::query()
+                    ->where(function ($query) use ($project, $milestoneIds, $taskIds) {
+                        $query->where(function ($projectQuery) use ($project) {
+                            $projectQuery
+                                ->whereIn('entity_type', [Project::class, class_basename(Project::class)])
+                                ->where('entity_id', $project->id);
+                        });
+
+                        if ($milestoneIds->isNotEmpty()) {
+                            $query->orWhere(function ($milestoneQuery) use ($milestoneIds) {
+                                $milestoneQuery
+                                    ->whereIn('entity_type', [Milestone::class, class_basename(Milestone::class)])
+                                    ->whereIn('entity_id', $milestoneIds->all());
+                            });
+                        }
+
+                        if ($taskIds->isNotEmpty()) {
+                            $query->orWhere(function ($taskQuery) use ($taskIds) {
+                                $taskQuery
+                                    ->whereIn('entity_type', [Task::class, class_basename(Task::class)])
+                                    ->whereIn('entity_id', $taskIds->all());
+                            });
+                        }
+                    })
+                    ->whereNotNull('storage_path')
+                    ->pluck('storage_path')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
 
                 $this->deletePolymorphicRows(Comment::class, Project::class, [$project->id]);
                 $this->deletePolymorphicRows(Attachment::class, Project::class, [$project->id]);
@@ -183,7 +215,13 @@ class ProjectRepository implements ProjectRepositoryInterface
                 }
 
                 $project->forceDelete();
+
+                return $attachmentPaths;
             });
+
+            if (!empty($attachmentPaths)) {
+                Storage::disk('public')->delete($attachmentPaths);
+            }
 
             return true;
         } catch (\Exception $e) {

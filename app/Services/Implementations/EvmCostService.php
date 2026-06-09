@@ -32,6 +32,10 @@ class EvmCostService implements EvmCostServiceInterface
 
         $tasks = Task::query()
             ->where('project_id', $projectId)
+            ->where(function ($query) {
+                $query->whereNull('milestone_id')
+                    ->orWhereHas('milestone');
+            })
             ->get([
                 'id',
                 'project_id',
