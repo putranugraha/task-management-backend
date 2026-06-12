@@ -35,6 +35,8 @@ class NotificationController extends Controller
                 'message' => $payload['message'] ?? null,
                 'task_id' => $payload['task_id'] ?? null,
                 'task_title' => $payload['task_title'] ?? null,
+                'project_id' => $payload['project_id'] ?? null,
+                'project_name' => $payload['project_name'] ?? null,
                 'entity_type' => $payload['entity_type'] ?? null,
                 'entity_id' => $payload['entity_id'] ?? null,
                 'attachment_id' => $payload['attachment_id'] ?? null,

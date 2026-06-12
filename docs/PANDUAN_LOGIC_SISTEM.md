@@ -4,8 +4,8 @@ Dokumen ini dibuat untuk membantu menjelaskan alur sistem dari awal, mulai dari 
 
 Repositori yang dipakai:
 
-- Backend Laravel: `D:\TA\task-management`
-- Frontend Next.js: `D:\TA\fe-task-management`
+- Backend Laravel: `D:\TA 2\task-management-copy`
+- Frontend Next.js: `D:\TA 2\fe-task-management-copy`
 
 ## 1. Gambaran Arsitektur
 
@@ -16,9 +16,11 @@ Frontend page/component
   -> API helper
   -> Laravel route
   -> Controller
+  -> Form Request
   -> Service
   -> Repository
   -> Model / Database
+  -> Resource JSON
 ```
 
 Penjelasan sederhananya:
@@ -26,9 +28,11 @@ Penjelasan sederhananya:
 - Frontend bertugas menampilkan halaman, tombol, form, toast, modal, dan memanggil API.
 - Route menentukan endpoint mana yang boleh diakses dan permission apa yang dibutuhkan.
 - Controller menerima request dan mengembalikan response.
+- Form Request memvalidasi input sebelum masuk ke service.
 - Service menyimpan logic bisnis, validasi alur, cache, activity log, dan aturan sistem.
 - Repository menjalankan query database.
 - Model mewakili tabel dan relasi database.
+- Resource mengatur bentuk response JSON agar frontend menerima format data yang konsisten.
 
 Contoh alur umum:
 
@@ -49,9 +53,9 @@ Admin klik tombol Archive Project
 
 File utama:
 
-- `D:\TA\fe-task-management\src\app\auth\login\page.tsx`
-- `D:\TA\fe-task-management\src\contexts\auth-context.tsx`
-- `D:\TA\fe-task-management\src\lib\api.ts`
+- `D:\TA 2\fe-task-management-copy\src\app\auth\login\page.tsx`
+- `D:\TA 2\fe-task-management-copy\src\contexts\auth-context.tsx`
+- `D:\TA 2\fe-task-management-copy\src\lib\api.ts`
 
 Saat user mengisi email dan password, page login memanggil fungsi `login(email, password)` dari auth context.
 
@@ -67,7 +71,7 @@ const res = await apiRequest<LoginResponse>("POST", "/api/login", {
 Lokasi:
 
 ```text
-D:\TA\fe-task-management\src\contexts\auth-context.tsx
+D:\TA 2\fe-task-management-copy\src\contexts\auth-context.tsx
 ```
 
 Setelah login berhasil, token dan data auth disimpan:
@@ -90,7 +94,7 @@ Tujuannya:
 File:
 
 ```text
-D:\TA\fe-task-management\src\lib\api.ts
+D:\TA 2\fe-task-management-copy\src\lib\api.ts
 ```
 
 Setiap request API akan otomatis diberi header Bearer token:
@@ -109,7 +113,7 @@ Artinya frontend tidak perlu menulis Authorization manual di setiap halaman.
 File:
 
 ```text
-D:\TA\task-management\app\Http\Controllers\AuthController.php
+D:\TA 2\task-management-copy\app\Http\Controllers\AuthController.php
 ```
 
 Method utama:
@@ -156,7 +160,7 @@ GET /api/profile
 Route profile ada di:
 
 ```text
-D:\TA\task-management\routes\api.php
+D:\TA 2\task-management-copy\routes\api.php
 ```
 
 Tujuannya untuk memastikan data role dan permission selalu terbaru dari backend.
@@ -168,7 +172,7 @@ Tujuannya untuk memastikan data role dan permission selalu terbaru dari backend.
 File:
 
 ```text
-D:\TA\task-management\database\seeders\RolePermissionSeeder.php
+D:\TA 2\task-management-copy\database\seeders\RolePermissionSeeder.php
 ```
 
 Permission sudah dipisah berdasarkan CRUD:
@@ -194,7 +198,7 @@ Ini lebih rapi daripada satu permission lama seperti `mengelola project`, karena
 File:
 
 ```text
-D:\TA\task-management\app\Models\User.php
+D:\TA 2\task-management-copy\app\Models\User.php
 ```
 
 Method:
@@ -228,7 +232,7 @@ Kesimpulan:
 File:
 
 ```text
-D:\TA\task-management\routes\api.php
+D:\TA 2\task-management-copy\routes\api.php
 ```
 
 Contoh route project:
@@ -262,7 +266,7 @@ Artinya:
 File:
 
 ```text
-D:\TA\fe-task-management\src\contexts\auth-context.tsx
+D:\TA 2\fe-task-management-copy\src\contexts\auth-context.tsx
 ```
 
 Auth context menyediakan:
@@ -283,30 +287,30 @@ const canDeleteProject = hasRole("Admin") && can("menghapus project");
 Lokasi contoh:
 
 ```text
-D:\TA\fe-task-management\src\app\dashboard\projects\page.tsx
+D:\TA 2\fe-task-management-copy\src\app\dashboard\projects\page.tsx
 ```
 
 Menu sidebar difilter di:
 
 ```text
-D:\TA\fe-task-management\src\components\app-sidebar.tsx
+D:\TA 2\fe-task-management-copy\src\components\app-sidebar.tsx
 ```
 
 Menu hanya tampil jika role/permission cocok dengan:
 
 ```text
-D:\TA\fe-task-management\src\config\menu.ts
+D:\TA 2\fe-task-management-copy\src\config\menu.ts
 ```
 
 ## 4. Project Management
 
 ### 4.1 File utama backend project
 
-- Controller: `D:\TA\task-management\app\Http\Controllers\ProjectController.php`
-- Service: `D:\TA\task-management\app\Services\Implementations\ProjectService.php`
-- Repository: `D:\TA\task-management\app\Repositories\Eloquent\ProjectRepository.php`
-- Model: `D:\TA\task-management\app\Models\Project.php`
-- Routes: `D:\TA\task-management\routes\api.php`
+- Controller: `D:\TA 2\task-management-copy\app\Http\Controllers\ProjectController.php`
+- Service: `D:\TA 2\task-management-copy\app\Services\Implementations\ProjectService.php`
+- Repository: `D:\TA 2\task-management-copy\app\Repositories\Eloquent\ProjectRepository.php`
+- Model: `D:\TA 2\task-management-copy\app\Models\Project.php`
+- Routes: `D:\TA 2\task-management-copy\routes\api.php`
 
 ### 4.2 Create project
 
@@ -514,10 +518,10 @@ Saat permanent delete dijalankan, project dan seluruh relasinya dihapus permanen
 
 File utama:
 
-- Controller: `D:\TA\task-management\app\Http\Controllers\MilestoneController.php`
-- Service: `D:\TA\task-management\app\Services\Implementations\MilestoneService.php`
-- Repository: `D:\TA\task-management\app\Repositories\Eloquent\MilestoneRepository.php`
-- Model: `D:\TA\task-management\app\Models\Milestone.php`
+- Controller: `D:\TA 2\task-management-copy\app\Http\Controllers\MilestoneController.php`
+- Service: `D:\TA 2\task-management-copy\app\Services\Implementations\MilestoneService.php`
+- Repository: `D:\TA 2\task-management-copy\app\Repositories\Eloquent\MilestoneRepository.php`
+- Model: `D:\TA 2\task-management-copy\app\Models\Milestone.php`
 
 Milestone adalah tahapan besar dalam project.
 
@@ -562,10 +566,10 @@ PATCH /api/milestones/{id}/restore
 
 File utama:
 
-- Controller: `D:\TA\task-management\app\Http\Controllers\TaskController.php`
-- Service: `D:\TA\task-management\app\Services\Implementations\TaskService.php`
-- Repository: `D:\TA\task-management\app\Repositories\Eloquent\TaskRepository.php`
-- Model: `D:\TA\task-management\app\Models\Task.php`
+- Controller: `D:\TA 2\task-management-copy\app\Http\Controllers\TaskController.php`
+- Service: `D:\TA 2\task-management-copy\app\Services\Implementations\TaskService.php`
+- Repository: `D:\TA 2\task-management-copy\app\Repositories\Eloquent\TaskRepository.php`
+- Model: `D:\TA 2\task-management-copy\app\Models\Task.php`
 
 Task adalah pekerjaan detail di dalam project atau milestone.
 
@@ -658,7 +662,7 @@ Tujuannya agar task tidak bisa sembarangan `In Progress` atau `Done` kalau depen
 File:
 
 ```text
-D:\TA\task-management\app\Services\Implementations\TaskService.php
+D:\TA 2\task-management-copy\app\Services\Implementations\TaskService.php
 ```
 
 Method:
@@ -723,7 +727,7 @@ task_dependencies
 File migration:
 
 ```text
-D:\TA\task-management\database\migrations\2025_09_13_000900_create_task_dependencies_table.php
+D:\TA 2\task-management-copy\database\migrations\2025_09_13_000900_create_task_dependencies_table.php
 ```
 
 Kolom penting:
@@ -754,7 +758,7 @@ Successor boleh selesai setelah predecessor mulai.
 Lokasi logic:
 
 ```text
-D:\TA\task-management\app\Services\Implementations\TaskService.php
+D:\TA 2\task-management-copy\app\Services\Implementations\TaskService.php
 ```
 
 Method:
@@ -795,7 +799,7 @@ if ($type === 'FS' && $predecessorEnd && $successorStartDate) {
 Lokasi logic:
 
 ```text
-D:\TA\task-management\app\Services\Implementations\TaskService.php
+D:\TA 2\task-management-copy\app\Services\Implementations\TaskService.php
 ```
 
 Method:
@@ -864,7 +868,7 @@ Kalau SS dengan lag 2 hari, successor baru boleh mulai atau selesai sesuai atura
 File:
 
 ```text
-D:\TA\fe-task-management\src\components\tasks\TaskDependencyEditor.tsx
+D:\TA 2\fe-task-management-copy\src\components\tasks\TaskDependencyEditor.tsx
 ```
 
 User bisa memilih:
@@ -876,7 +880,7 @@ User bisa memilih:
 Frontend juga melakukan validasi ringan di edit task:
 
 ```text
-D:\TA\fe-task-management\src\app\dashboard\tasks\[id]\edit\page.tsx
+D:\TA 2\fe-task-management-copy\src\app\dashboard\tasks\[id]\edit\page.tsx
 ```
 
 Catatan penting:
@@ -893,13 +897,13 @@ Validasi yang benar-benar wajib tetap di backend TaskService.
 Halaman:
 
 ```text
-D:\TA\fe-task-management\src\app\dashboard\projects\[id]\gantt\page.tsx
+D:\TA 2\fe-task-management-copy\src\app\dashboard\projects\[id]\gantt\page.tsx
 ```
 
 Komponen:
 
 ```text
-D:\TA\fe-task-management\src\components\gantt\GanttChart.tsx
+D:\TA 2\fe-task-management-copy\src\components\gantt\GanttChart.tsx
 ```
 
 ### 9.2 Data yang dipakai
@@ -916,7 +920,7 @@ const [t, m] = await Promise.all([
 Task API dipanggil dengan include dependencies:
 
 ```text
-D:\TA\fe-task-management\src\lib\api\tasks.ts
+D:\TA 2\fe-task-management-copy\src\lib\api\tasks.ts
 ```
 
 Tujuannya agar Gantt bisa menggambar garis dependency.
@@ -926,7 +930,7 @@ Tujuannya agar Gantt bisa menggambar garis dependency.
 File:
 
 ```text
-D:\TA\fe-task-management\src\components\gantt\GanttChart.tsx
+D:\TA 2\fe-task-management-copy\src\components\gantt\GanttChart.tsx
 ```
 
 Komponen:
@@ -980,8 +984,8 @@ EVM effort-based menghitung performa berdasarkan effort/jam kerja.
 File backend:
 
 ```text
-D:\TA\task-management\app\Http\Controllers\EvmController.php
-D:\TA\task-management\app\Services\Implementations\EvmService.php
+D:\TA 2\task-management-copy\app\Http\Controllers\EvmController.php
+D:\TA 2\task-management-copy\app\Services\Implementations\EvmService.php
 ```
 
 Endpoint:
@@ -1050,8 +1054,8 @@ EVM cost-based adalah EVM berbasis uang/rupiah.
 File backend:
 
 ```text
-D:\TA\task-management\app\Http\Controllers\EvmCostController.php
-D:\TA\task-management\app\Services\Implementations\EvmCostService.php
+D:\TA 2\task-management-copy\app\Http\Controllers\EvmCostController.php
+D:\TA 2\task-management-copy\app\Services\Implementations\EvmCostService.php
 ```
 
 Endpoint:
@@ -1063,7 +1067,7 @@ GET /api/projects/{project}/evm-cost?as_of=YYYY-MM-DD&baseline_id=ID
 File frontend widget:
 
 ```text
-D:\TA\fe-task-management\src\components\evm\EvmCostWidget.tsx
+D:\TA 2\fe-task-management-copy\src\components\evm\EvmCostWidget.tsx
 ```
 
 ### 11.1 Data sumber cost-based
@@ -1179,13 +1183,13 @@ Actual cost tidak diambil dari budget, tetapi dari ledger biaya aktual.
 File frontend:
 
 ```text
-D:\TA\fe-task-management\src\components\tasks\TaskCostEntriesSection.tsx
+D:\TA 2\fe-task-management-copy\src\components\tasks\TaskCostEntriesSection.tsx
 ```
 
 File backend:
 
 ```text
-D:\TA\task-management\app\Http\Controllers\TaskCostEntryController.php
+D:\TA 2\task-management-copy\app\Http\Controllers\TaskCostEntryController.php
 ```
 
 Tabel:
@@ -1255,8 +1259,8 @@ task_baselines
 File service:
 
 ```text
-D:\TA\task-management\app\Services\Implementations\ProjectBaselineService.php
-D:\TA\task-management\app\Services\Implementations\TaskBaselineService.php
+D:\TA 2\task-management-copy\app\Services\Implementations\ProjectBaselineService.php
+D:\TA 2\task-management-copy\app\Services\Implementations\TaskBaselineService.php
 ```
 
 Baseline menyimpan:
@@ -1293,9 +1297,9 @@ kpi_snapshots
 File:
 
 ```text
-D:\TA\task-management\app\Http\Controllers\ReportingPeriodController.php
-D:\TA\task-management\app\Http\Controllers\KpiSnapshotController.php
-D:\TA\task-management\app\Services\Implementations\KpiSnapshotService.php
+D:\TA 2\task-management-copy\app\Http\Controllers\ReportingPeriodController.php
+D:\TA 2\task-management-copy\app\Http\Controllers\KpiSnapshotController.php
+D:\TA 2\task-management-copy\app\Services\Implementations\KpiSnapshotService.php
 ```
 
 Dipakai untuk laporan project, seperti:
@@ -1329,6 +1333,15 @@ Restore menghapus nilai `deleted_at`, sehingga data kembali aktif.
 $project->restore();
 ```
 
+Restore child juga memperhatikan parent:
+
+```text
+Restore milestone ditolak jika project parent masih archived.
+Restore task ditolak jika project atau milestone parent masih archived.
+```
+
+Tujuannya agar data child tidak aktif sendiri ketika parent masih berada di archive.
+
 ### 16.3 Permanent delete
 
 Permanent delete hanya untuk data archive.
@@ -1359,10 +1372,34 @@ Cascade database menghapus:
 - reporting periods
 - KPI snapshots
 
+### 16.4 Dampak archive ke perhitungan
+
+Archive tidak hanya memengaruhi tampilan list, tetapi juga data aktif untuk perhitungan.
+
+Aturannya:
+
+```text
+Project archived = project tidak tampil di list aktif dan child-nya tidak tampil sebagai data aktif.
+Milestone archived = milestone tidak tampil di list aktif dan task di bawah milestone tersebut tidak dihitung sebagai task aktif.
+Task archived = task tidak tampil di list aktif dan tidak dihitung dalam EVM/KPI aktif.
+```
+
+Untuk EVM dan KPI:
+
+```text
+Task yang berada di bawah milestone archived dikeluarkan dari perhitungan EVM, SPI effort, EVM cost, dan KPI snapshot.
+```
+
+Penjelasan ke dosen:
+
+```text
+Archive dianggap sebagai data nonaktif. Karena itu data archived tidak ikut dihitung pada metrik aktif agar total task, progress, EVM, dan KPI sesuai dengan kondisi project yang sedang berjalan.
+```
+
 Frontend warning ada di:
 
 ```text
-D:\TA\fe-task-management\src\app\dashboard\projects\archive\page.tsx
+D:\TA 2\fe-task-management-copy\src\app\dashboard\projects\archive\page.tsx
 ```
 
 Pesan konfirmasi menjelaskan bahwa data tidak bisa di-restore.
@@ -1389,15 +1426,190 @@ Manfaat:
 Frontend activity log:
 
 ```text
-D:\TA\fe-task-management\src\app\dashboard\activity-log\page.tsx
+D:\TA 2\fe-task-management-copy\src\app\dashboard\activity-log\page.tsx
 ```
 
-## 18. Seeder Demo Project Management
+## 18. Notification dan Email
+
+Sistem memiliki notifikasi internal dashboard dan notifikasi email.
+
+File backend:
+
+```text
+D:\TA 2\task-management-copy\app\Notifications\TaskActivityNotification.php
+D:\TA 2\task-management-copy\app\Http\Controllers\NotificationController.php
+D:\TA 2\task-management-copy\app\Console\Commands\SendTaskDeadlineNotifications.php
+D:\TA 2\task-management-copy\routes\console.php
+D:\TA 2\task-management-copy\config\notifications.php
+```
+
+File frontend:
+
+```text
+D:\TA 2\fe-task-management-copy\src\app\dashboard\notifications\page.tsx
+D:\TA 2\fe-task-management-copy\src\contexts\notification-context.tsx
+D:\TA 2\fe-task-management-copy\src\lib\api\notifications.ts
+```
+
+### 18.1 Alur notification
+
+Alur umumnya:
+
+```text
+Event terjadi di backend
+  -> backend memanggil notify(new TaskActivityNotification)
+  -> notification masuk ke tabel notifications
+  -> jika mail aktif, notification juga dikirim ke email user
+  -> frontend mengambil data dari GET /api/me/notifications
+  -> sidebar menampilkan unread count
+  -> user membuka halaman notifications
+```
+
+Channel default di notification:
+
+```php
+$channels = ['database'];
+```
+
+Jika email notification aktif:
+
+```php
+if (config('notifications.mail_enabled') && !empty($notifiable->email)) {
+    $channels[] = 'mail';
+}
+```
+
+Artinya:
+
+```text
+Setiap notifikasi tetap masuk dashboard.
+Jika NOTIFICATIONS_MAIL_ENABLED=true dan user punya email, notifikasi juga dikirim ke Gmail/email.
+```
+
+### 18.2 Event yang dikirim
+
+Event notification yang sudah didukung:
+
+```text
+task_assigned
+comment_added
+attachment_uploaded
+attachment_approved
+attachment_rejected
+task_status_changed
+task_progress_updated
+task_due_soon
+task_overdue
+```
+
+Penjelasan:
+
+- `task_assigned`: user mendapat assignment task baru.
+- `comment_added`: ada komentar baru pada task.
+- `attachment_uploaded`: ada lampiran baru yang diunggah.
+- `attachment_approved`: lampiran disetujui.
+- `attachment_rejected`: lampiran ditolak.
+- `task_status_changed`: status task berubah.
+- `task_progress_updated`: progress task berubah.
+- `task_due_soon`: task mendekati deadline.
+- `task_overdue`: task sudah melewati deadline.
+
+### 18.3 Deadline notification
+
+Command deadline:
+
+```bash
+php artisan notifications:task-deadlines --days=3
+```
+
+Command ini mencari task dengan kondisi:
+
+```text
+end_planned tidak kosong
+status bukan Done atau Cancelled
+tanggal deadline <= hari ini + jumlah days
+project parent masih aktif
+milestone parent masih aktif jika task berada di milestone
+```
+
+Jika `end_planned` sudah lewat dari hari ini:
+
+```text
+event = task_overdue
+```
+
+Jika `end_planned` masih dalam rentang `days`:
+
+```text
+event = task_due_soon
+```
+
+Penerima deadline notification:
+
+```text
+assignee task
+owner project
+semua user yang terlibat dalam project lewat task_assignments
+Admin
+Super Admin
+```
+
+Command dijadwalkan di:
+
+```text
+D:\TA 2\task-management-copy\routes\console.php
+```
+
+Schedule:
+
+```php
+Schedule::command('notifications:task-deadlines --days=3')
+    ->dailyAt('08:00')
+    ->withoutOverlapping();
+```
+
+Catatan production:
+
+```text
+Schedule ini terdaftar di Laravel, tetapi server tetap harus menjalankan schedule runner seperti php artisan schedule:run setiap menit.
+```
+
+### 18.4 Environment email
+
+Env penting:
+
+```env
+NOTIFICATIONS_MAIL_ENABLED=true
+FRONTEND_URL=https://task-centralsaga.web.id
+
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=email_pengirim@gmail.com
+MAIL_PASSWORD="app password gmail"
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=email_pengirim@gmail.com
+MAIL_FROM_NAME="Central Saga Task Management"
+```
+
+Setelah mengubah `.env`, jalankan:
+
+```bash
+php artisan config:clear
+```
+
+Kalimat sidang:
+
+```text
+Sistem menggunakan Laravel Notification. Notifikasi selalu disimpan di database untuk dashboard. Jika konfigurasi email aktif, notification yang sama juga dikirim melalui SMTP Gmail ke email user penerima.
+```
+
+## 19. Seeder Demo Project Management
 
 File:
 
 ```text
-D:\TA\task-management\database\seeders\DemoProjectManagementSeeder.php
+D:\TA 2\task-management-copy\database\seeders\DemoProjectManagementSeeder.php
 ```
 
 Seeder ini membuat data demo:
@@ -1426,9 +1638,9 @@ User demo:
 - Ayu Pradnya sebagai manager
 - Gustra, Gung Aria, Dwiki sebagai tim software
 
-## 19. Cara Menjelaskan ke Dosen
+## 20. Cara Menjelaskan ke Dosen
 
-### 19.1 Penjelasan arsitektur
+### 20.1 Penjelasan arsitektur
 
 Kalimat sederhana:
 
@@ -1436,37 +1648,37 @@ Kalimat sederhana:
 Sistem ini memakai arsitektur berlapis. Frontend hanya mengirim request dan menampilkan data. Backend memproses request melalui route, controller, service, repository, lalu database. Logic bisnis seperti permission, dependency, archive, dan EVM ditempatkan di backend agar tetap aman walaupun frontend dimanipulasi.
 ```
 
-### 19.2 Penjelasan role permission
+### 20.2 Penjelasan role permission
 
 ```text
 Permission dipisah berdasarkan CRUD. Misalnya melihat project hanya untuk view, membuat project untuk create, mengubah project untuk edit, dan menghapus project untuk archive. Dengan begitu tombol di frontend bisa disembunyikan sesuai permission, dan backend tetap memvalidasi lewat middleware.
 ```
 
-### 19.3 Penjelasan archive
+### 20.3 Penjelasan archive
 
 ```text
 Data tidak langsung dihapus permanen. Saat delete dari halaman utama, sistem menjalankan soft delete sehingga data masuk archive. Admin masih bisa restore. Permanent delete hanya tersedia di halaman archive dengan konfirmasi, agar data penting tidak terhapus tidak sengaja.
 ```
 
-### 19.4 Penjelasan dependency
+### 20.4 Penjelasan dependency
 
 ```text
 Task dependency digunakan untuk mengatur urutan kerja. Sistem mendukung FS, SS, FF, dan SF. Lag day digunakan sebagai jeda hari dari task pendahulu. Backend menolak perubahan status atau jadwal task jika dependency belum terpenuhi.
 ```
 
-### 19.5 Penjelasan EVM
+### 20.5 Penjelasan EVM
 
 ```text
 EVM digunakan untuk mengukur performa project. Sistem menghitung PV, EV, AC, SV, SPI, CV, CPI, EAC, dan ETC. Untuk cost-based EVM, PV dan EV berasal dari budget task, AC berasal dari biaya aktual, dan BAC berasal dari nilai project atau total budget task.
 ```
 
-### 19.6 Penjelasan Gantt
+### 20.6 Penjelasan Gantt
 
 ```text
 Gantt Chart menampilkan timeline task dan dependency. Fitur ini bukan sekadar chart, tetapi terhubung langsung dengan data task, milestone, dependency, dan baseline di sistem.
 ```
 
-## 20. Peta File Cepat
+## 21. Peta File Cepat
 
 Backend:
 
@@ -1483,9 +1695,12 @@ app/Services/Implementations/EvmService.php
 app/Services/Implementations/EvmCostService.php
 app/Repositories/Eloquent/ProjectRepository.php
 app/Repositories/Eloquent/TaskRepository.php
+app/Notifications/TaskActivityNotification.php
+app/Console/Commands/SendTaskDeadlineNotifications.php
 app/Models/User.php
 app/Models/Project.php
 app/Models/Task.php
+routes/console.php
 database/seeders/RolePermissionSeeder.php
 database/seeders/DemoProjectManagementSeeder.php
 ```
@@ -1506,10 +1721,13 @@ src/components/gantt/GanttChart.tsx
 src/components/evm/EvmCostWidget.tsx
 src/components/evm/EvmWidget.tsx
 src/components/tasks/TaskDependencyEditor.tsx
+src/app/dashboard/notifications/page.tsx
+src/contexts/notification-context.tsx
+src/lib/api/notifications.ts
 src/app/dashboard/tasks/[id]/edit/page.tsx
 ```
 
-## 21. Checklist Demo Sistem
+## 22. Checklist Demo Sistem
 
 Urutan demo yang bagus:
 
@@ -1523,12 +1741,14 @@ Urutan demo yang bagus:
 8. Coba ubah status task yang belum memenuhi dependency, sistem menolak.
 9. Buka Gantt Chart dan tunjukkan garis dependency.
 10. Buka EVM cost-based dan jelaskan PV, EV, AC, SPI, CPI.
-11. Archive project dari halaman project.
-12. Buka Project Archive.
-13. Restore project.
-14. Archive lagi, lalu tunjukkan tombol Permanent Delete dan peringatannya.
+11. Buka halaman Notifications dan jelaskan notif dashboard serta email.
+12. Jalankan atau jelaskan command deadline notification.
+13. Archive project dari halaman project.
+14. Buka Project Archive.
+15. Restore project.
+16. Archive lagi, lalu tunjukkan tombol Permanent Delete dan peringatannya.
 
-## 22. Catatan Penting
+## 23. Catatan Penting
 
 - Frontend permission hanya untuk tampilan dan UX.
 - Backend permission adalah keamanan utama.

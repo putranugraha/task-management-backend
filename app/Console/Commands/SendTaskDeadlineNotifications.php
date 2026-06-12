@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Task;
+use App\Models\TaskAssignment;
 use App\Models\User;
 use App\Notifications\TaskActivityNotification;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ class SendTaskDeadlineNotifications extends Command
         {--days=3 : Jumlah hari ke depan untuk task_due_soon}
         {--date= : Tanggal simulasi/debug format Y-m-d}';
 
-    protected $description = 'Send task due soon and overdue notifications to assignees and admins.';
+    protected $description = 'Send task due soon and overdue notifications to assignees, project owner, project members, and admins.';
 
     public function handle(): int
     {
@@ -24,9 +25,14 @@ class SendTaskDeadlineNotifications extends Command
         $until = $today->copy()->addDays($days);
 
         $tasks = Task::query()
-            ->with(['assignments.user'])
+            ->with(['assignments.user', 'project.divisionOwner'])
             ->whereNotNull('end_planned')
             ->whereNotIn('status', ['Done', 'Cancelled'])
+            ->whereHas('project')
+            ->where(function ($query) {
+                $query->whereNull('milestone_id')
+                    ->orWhereHas('milestone');
+            })
             ->whereDate('end_planned', '<=', $until->toDateString())
             ->get();
 
@@ -48,6 +54,8 @@ class SendTaskDeadlineNotifications extends Command
                     'task_title' => $task->title,
                     'entity_type' => 'Task',
                     'entity_id' => $task->id,
+                    'project_id' => $task->project_id,
+                    'project_name' => $task->project?->name,
                     'due_date' => $dueDate->toDateString(),
                     'message' => $this->messageFor($eventType, $task->title, $dueDate, $today),
                 ]));
@@ -79,13 +87,29 @@ class SendTaskDeadlineNotifications extends Command
             ->map(fn ($assignment) => $assignment->user ?? null)
             ->filter(fn ($user) => $user instanceof User);
 
+        $projectOwner = $task->project?->divisionOwner instanceof User
+            ? collect([$task->project->divisionOwner])
+            : collect();
+
+        $projectMembers = TaskAssignment::query()
+            ->with('user')
+            ->whereHas('task', function ($query) use ($task) {
+                $query->where('project_id', $task->project_id);
+            })
+            ->get()
+            ->map(fn (TaskAssignment $assignment) => $assignment->user)
+            ->filter(fn ($user) => $user instanceof User);
+
         $admins = User::query()
             ->where('status', 'Aktif')
             ->whereHas('roles', fn ($query) => $query->whereIn('name', ['Admin', 'Super Admin']))
             ->get();
 
         return $assignees
+            ->merge($projectOwner)
+            ->merge($projectMembers)
             ->merge($admins)
+            ->filter(fn (User $user) => ($user->status ?? 'Aktif') === 'Aktif' && (bool) ($user->is_active ?? true))
             ->unique('id')
             ->values();
     }

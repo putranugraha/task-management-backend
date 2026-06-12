@@ -40,6 +40,8 @@ class TaskActivityNotification extends Notification
             'event' => $this->eventType,
             'task_id' => $this->payload['task_id'] ?? null,
             'task_title' => $this->payload['task_title'] ?? null,
+            'project_id' => $this->payload['project_id'] ?? null,
+            'project_name' => $this->payload['project_name'] ?? null,
             'entity_type' => $this->payload['entity_type'] ?? null,
             'entity_id' => $this->payload['entity_id'] ?? null,
             'attachment_id' => $this->payload['attachment_id'] ?? null,
@@ -60,12 +62,22 @@ class TaskActivityNotification extends Notification
         $taskTitle = $this->payload['task_title'] ?? 'Task';
         $message = $this->payload['message'] ?? $this->defaultMessage($taskTitle);
         $actorName = $this->payload['actor_name'] ?? null;
+        $projectName = $this->payload['project_name'] ?? null;
+        $dueDate = $this->payload['due_date'] ?? null;
         $url = $this->taskUrl();
 
         $mail = (new MailMessage)
             ->subject($this->mailSubject($taskTitle))
             ->greeting('Halo '.$notifiable->name.',')
             ->line($message);
+
+        if ($projectName) {
+            $mail->line('Project: '.$projectName);
+        }
+
+        if ($dueDate) {
+            $mail->line('Deadline: '.$dueDate);
+        }
 
         if ($actorName) {
             $mail->line('Dipicu oleh: '.$actorName);

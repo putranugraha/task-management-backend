@@ -6,6 +6,9 @@ use App\Models\Attachment;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskAssignment;
+use App\Models\User;
+use App\Notifications\TaskActivityNotification;
 use App\Repositories\Eloquent\MilestoneRepository;
 use App\Repositories\Eloquent\ProjectRepository;
 use App\Repositories\Eloquent\TaskRepository;
@@ -13,6 +16,7 @@ use App\Services\Contracts\EvmCostServiceInterface;
 use App\Services\Contracts\EvmServiceInterface;
 use App\Services\Contracts\KpiSnapshotServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -165,5 +169,51 @@ class ArchiveBehaviorTest extends TestCase
         $snapshot = app(KpiSnapshotServiceInterface::class)->generateForProjectAndDate($project->id, '2026-06-03');
 
         $this->assertSame(1, (int) $snapshot->tasks_total);
+    }
+
+    public function test_deadline_notifications_include_task_assignee_project_owner_and_project_members(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $taskAssignee = User::factory()->create();
+        $projectMember = User::factory()->create();
+        $outsideUser = User::factory()->create();
+
+        $project = Project::factory()->create([
+            'division_owner_id' => $owner->id,
+        ]);
+
+        $lateTask = Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => 'In Progress',
+            'end_planned' => '2026-06-10',
+        ]);
+
+        $otherProjectTask = Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => 'In Progress',
+            'end_planned' => '2026-06-20',
+        ]);
+
+        TaskAssignment::factory()->create([
+            'task_id' => $lateTask->id,
+            'user_id' => $taskAssignee->id,
+            'role_on_task' => 'Member',
+        ]);
+
+        TaskAssignment::factory()->create([
+            'task_id' => $otherProjectTask->id,
+            'user_id' => $projectMember->id,
+            'role_on_task' => 'Member',
+        ]);
+
+        $this->artisan('notifications:task-deadlines --days=3 --date=2026-06-12')
+            ->assertSuccessful();
+
+        Notification::assertSentTo($owner, TaskActivityNotification::class);
+        Notification::assertSentTo($taskAssignee, TaskActivityNotification::class);
+        Notification::assertSentTo($projectMember, TaskActivityNotification::class);
+        Notification::assertNotSentTo($outsideUser, TaskActivityNotification::class);
     }
 }

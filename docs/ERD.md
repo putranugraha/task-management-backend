@@ -41,8 +41,10 @@ erDiagram
     USERS ||--o{ ATTACHMENTS : verifies
     TASKS ||--o{ COMMENTS : polymorphic_entity
     PROJECTS ||--o{ COMMENTS : polymorphic_entity
+    MILESTONES ||--o{ COMMENTS : polymorphic_entity
     TASKS ||--o{ ATTACHMENTS : polymorphic_entity
     PROJECTS ||--o{ ATTACHMENTS : polymorphic_entity
+    MILESTONES ||--o{ ATTACHMENTS : polymorphic_entity
 
     ROLES ||--o{ MODEL_HAS_ROLES : assigned
     USERS ||--o{ MODEL_HAS_ROLES : model
@@ -59,6 +61,7 @@ erDiagram
         string code UK
         string name
         text description
+        string status
         timestamp created_at
         timestamp updated_at
     }
@@ -92,6 +95,7 @@ erDiagram
         string status
         timestamp created_at
         timestamp updated_at
+        timestamp deleted_at
     }
 
     MILESTONES {
@@ -103,6 +107,7 @@ erDiagram
         string status
         timestamp created_at
         timestamp updated_at
+        timestamp deleted_at
     }
 
     TASKS {
@@ -123,6 +128,7 @@ erDiagram
         decimal budget_cost
         timestamp created_at
         timestamp updated_at
+        timestamp deleted_at
     }
 
     TASK_ASSIGNMENTS {
@@ -203,6 +209,7 @@ erDiagram
         text note
         date start_planned_base
         date end_planned_base
+        decimal value_amount_base
         timestamp created_at
         timestamp updated_at
     }
@@ -216,6 +223,7 @@ erDiagram
         int duration_planned_base
         decimal weight
         decimal planned_effort_hours
+        decimal budget_cost_base
         timestamp created_at
         timestamp updated_at
     }
@@ -266,6 +274,7 @@ erDiagram
         bigint id PK
         string name
         string guard_name
+        string status
         timestamp created_at
         timestamp updated_at
     }
@@ -274,6 +283,7 @@ erDiagram
         bigint id PK
         string name
         string guard_name
+        string status
         timestamp created_at
         timestamp updated_at
     }
@@ -338,8 +348,11 @@ erDiagram
 - `tasks 1..n task_baselines`: satu task bisa punya banyak snapshot baseline.
 - `projects 1..n reporting_periods`: periode pelaporan KPI project. Kombinasi `project_id + period_date` unik.
 - `reporting_periods 1..n kpi_snapshots`: snapshot KPI dibuat per periode. Kombinasi `project_id + period_id` unik.
-- `comments` dan `attachments` memakai relasi polymorphic lewat `entity_type + entity_id`, jadi bisa ditempel ke entity berbeda, misalnya `Project` atau `Task`.
+- `comments` dan `attachments` memakai relasi polymorphic lewat `entity_type + entity_id`, jadi bisa ditempel ke entity berbeda, misalnya `Project`, `Milestone`, atau `Task`.
 - `users n..m roles` dan `users n..m permissions` dikelola package Spatie Permission lewat tabel pivot polymorphic.
+- `projects`, `milestones`, dan `tasks` memakai soft delete lewat kolom `deleted_at`, sehingga data bisa masuk archive dan direstore.
+- `roles`, `permissions`, dan `divisions` memiliki kolom `status` untuk menonaktifkan data tanpa menghapusnya.
+- `project_baselines.value_amount_base` dan `task_baselines.budget_cost_base` menyimpan snapshot biaya agar EVM cost-based bisa memakai nilai baseline.
 
 ## Catatan Tabel Sistem
 
@@ -353,6 +366,6 @@ erDiagram
 
 - Pusat data aplikasi adalah `projects`, `tasks`, dan `users`.
 - `milestones` hanya pengelompokan/target waktu task, bukan tabel wajib untuk semua task karena `tasks.milestone_id` nullable.
-- `comments` dan `attachments` tidak punya FK langsung ke `tasks` atau `projects` karena desainnya polymorphic.
+- `comments` dan `attachments` tidak punya FK langsung ke `tasks`, `milestones`, atau `projects` karena desainnya polymorphic.
 - `kpi_snapshots` menyimpan hasil hitung KPI, bukan sumber data utama. Sumber hitungnya tetap dari `tasks` dan `reporting_periods`.
 - `task_baselines.baseline_id` akhirnya nullable karena ada migration yang mengubah FK menjadi `nullOnDelete`.
