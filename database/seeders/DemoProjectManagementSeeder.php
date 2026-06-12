@@ -33,8 +33,8 @@ class DemoProjectManagementSeeder extends Seeder
 
     public function run(): void
     {
-        // Demo position for thesis presentation: active projects with healthy KPI/EVM through mid June.
-        $this->today = Carbon::create(2026, 6, 16);
+        // Demo position for thesis presentation: active projects with healthy KPI/EVM through 30 June.
+        $this->today = Carbon::create(2026, 6, 30);
 
         DB::transaction(function () {
             if (Role::whereIn('name', ['Admin', 'Manager', 'Member'])->count() < 3) {
@@ -59,10 +59,10 @@ class DemoProjectManagementSeeder extends Seeder
                 'client_name' => 'Margi Nusa Penida',
                 'value_amount' => 13200000,
                 'start' => '2026-05-13',
-                'end' => '2026-06-23',
+                'end' => '2026-06-30',
                 'scope' => 'Website trip tirta yatra Bali dan Nusa Penida dengan katalog paket, itinerary, galeri destinasi, artikel ringan, dan form inquiry WhatsApp.',
                 'objective' => 'Meningkatkan kepercayaan calon pemesan dan membuat alur konsultasi paket tirta yatra lebih cepat.',
-                'snapshot_dates' => ['2026-05-26', '2026-06-02', '2026-06-09', '2026-06-16'],
+                'snapshot_dates' => ['2026-05-26', '2026-06-02', '2026-06-09', '2026-06-16', '2026-06-23', '2026-06-30'],
                 'milestones' => [
                     [
                         'name' => 'Discovery & Perencanaan',
@@ -81,7 +81,7 @@ class DemoProjectManagementSeeder extends Seeder
                         'due_actual' => '2026-06-02',
                         'status' => 'Completed',
                         'tasks' => [
-                            $this->task('MNP-T04', 'Desain UI homepage Margi Nusa Penida', 'High', '2026-05-21', '2026-05-26', 1550000, 'gungaria', 42, ['2026-05-26' => 85, '2026-06-02' => 100], 0.98),
+                            $this->task('MNP-T04', 'Desain UI homepage Margi Nusa Penida', 'High', '2026-05-21', '2026-05-26', 1400000, 'gungaria', 42, ['2026-05-26' => 85, '2026-06-02' => 100], 0.98),
                             $this->task('MNP-T05', 'Desain halaman paket trip dan itinerary', 'High', '2026-05-27', '2026-06-02', 1450000, 'gungindra', 46, ['2026-06-02' => 100], 1.01),
                         ],
                     ],
@@ -91,21 +91,21 @@ class DemoProjectManagementSeeder extends Seeder
                         'due_actual' => null,
                         'status' => 'In Progress',
                         'tasks' => [
-                            $this->task('MNP-T06', 'Implementasi frontend homepage dan layout utama', 'High', '2026-06-01', '2026-06-07', 2100000, 'gustra', 54, ['2026-06-02' => 25, '2026-06-09' => 100], 1.02),
-                            $this->task('MNP-T07', 'Implementasi halaman paket trip dan detail itinerary', 'High', '2026-06-04', '2026-06-18', 1800000, 'krisna', 58, ['2026-06-09' => 55, '2026-06-16' => 92], 0.96),
-                            $this->task('MNP-T08', 'Integrasi form inquiry WhatsApp dan tracking sumber lead', 'Medium', '2026-06-10', '2026-06-17', 900000, 'mahen', 36, ['2026-06-16' => 68], 0.94),
-                            $this->task('MNP-T09', 'Setup galeri destinasi dan optimasi gambar', 'Medium', '2026-06-12', '2026-06-19', 780000, 'dwiki', 34, ['2026-06-16' => 45], 0.97),
+                            $this->task('MNP-T06', 'Implementasi frontend homepage dan layout utama', 'High', '2026-06-01', '2026-06-07', 1900000, 'gustra', 54, ['2026-06-02' => 25, '2026-06-09' => 100], 1.02),
+                            $this->task('MNP-T07', 'Implementasi halaman paket trip dan detail itinerary', 'High', '2026-06-04', '2026-06-20', 1800000, 'krisna', 58, ['2026-06-09' => 55, '2026-06-16' => 92, '2026-06-20' => 100], 0.96),
+                            $this->task('MNP-T08', 'Integrasi form inquiry WhatsApp dan tracking sumber lead', 'Medium', '2026-06-10', '2026-06-21', 900000, 'mahen', 36, ['2026-06-16' => 68, '2026-06-21' => 100], 0.94),
+                            $this->task('MNP-T09', 'Setup galeri destinasi dan optimasi gambar', 'Medium', '2026-06-12', '2026-06-22', 780000, 'dwiki', 34, ['2026-06-16' => 45, '2026-06-22' => 100], 0.97),
                             $this->task('MNP-T10', 'Setup hosting, domain, dan staging awal', 'Medium', '2026-06-03', '2026-06-06', 620000, 'wisnu', 22, ['2026-06-09' => 100], 1.04),
                         ],
                     ],
                     [
                         'name' => 'Testing & Go Live',
-                        'due_planned' => '2026-06-23',
+                        'due_planned' => '2026-06-30',
                         'due_actual' => null,
                         'status' => 'Planned',
                         'tasks' => [
-                            $this->task('MNP-T11', 'Testing responsive mobile dan browser utama', 'Medium', '2026-06-17', '2026-06-20', 650000, 'divo', 28, [], 1.00),
-                            $this->task('MNP-T12', 'Final deployment dan handover admin', 'High', '2026-06-21', '2026-06-23', 1500000, 'madeadi', 24, [], 1.00),
+                            $this->task('MNP-T11', 'Testing responsive mobile dan browser utama', 'Medium', '2026-06-23', '2026-06-27', 650000, 'divo', 28, ['2026-06-23' => 35, '2026-06-27' => 100], 1.00),
+                            $this->task('MNP-T12', 'Final deployment dan handover admin', 'High', '2026-06-26', '2026-06-30', 1100000, 'madeadi', 24, ['2026-06-27' => 60, '2026-06-30' => 100], 1.00),
                         ],
                     ],
                 ],
@@ -134,7 +134,7 @@ class DemoProjectManagementSeeder extends Seeder
                 'end' => '2026-06-30',
                 'scope' => 'Website profil dapur dan supplier MBG dengan informasi kapasitas produksi, menu, fasilitas dapur, standar kebersihan, dokumentasi legal, dan form kerja sama.',
                 'objective' => 'Membuat profil digital yang kredibel untuk presentasi supplier MBG dan komunikasi kerja sama dengan sekolah atau mitra.',
-                'snapshot_dates' => ['2026-05-26', '2026-06-02', '2026-06-09', '2026-06-16'],
+                'snapshot_dates' => ['2026-05-26', '2026-06-02', '2026-06-09', '2026-06-16', '2026-06-23', '2026-06-30'],
                 'milestones' => [
                     [
                         'name' => 'Requirement & Operational Mapping',
@@ -155,7 +155,7 @@ class DemoProjectManagementSeeder extends Seeder
                         'tasks' => [
                             $this->task('MBG-T04', 'Rancang struktur halaman profil supplier MBG', 'High', '2026-05-29', '2026-06-03', 850000, 'wira', 36, ['2026-06-02' => 75, '2026-06-09' => 100], 0.97),
                             $this->task('MBG-T05', 'Desain UI homepage Supplier MBG Sumber Wangi', 'High', '2026-06-02', '2026-06-09', 1750000, 'gungaria', 48, ['2026-06-09' => 85, '2026-06-16' => 100], 1.00),
-                            $this->task('MBG-T06', 'Desain halaman menu mingguan dan standar gizi', 'Medium', '2026-06-07', '2026-06-18', 1150000, 'mahen', 38, ['2026-06-09' => 35, '2026-06-16' => 82], 0.96),
+                            $this->task('MBG-T06', 'Desain halaman menu mingguan dan standar gizi', 'Medium', '2026-06-07', '2026-06-18', 1150000, 'mahen', 38, ['2026-06-09' => 35, '2026-06-16' => 82, '2026-06-18' => 100], 0.96),
                         ],
                     ],
                     [
@@ -165,9 +165,9 @@ class DemoProjectManagementSeeder extends Seeder
                         'status' => 'In Progress',
                         'tasks' => [
                             $this->task('MBG-T07', 'Setup staging dan struktur repository', 'Medium', '2026-06-04', '2026-06-06', 650000, 'wisnu', 20, ['2026-06-09' => 100], 1.02),
-                            $this->task('MBG-T08', 'Implementasi halaman profil perusahaan dan fasilitas dapur', 'High', '2026-06-10', '2026-06-18', 2600000, 'gustra', 56, ['2026-06-16' => 62], 0.95),
-                            $this->task('MBG-T09', 'Implementasi katalog menu MBG dan kapasitas produksi', 'High', '2026-06-14', '2026-06-23', 2150000, 'dwiki', 54, ['2026-06-16' => 32], 0.94),
-                            $this->task('MBG-T10', 'Dokumentasi standar kebersihan dan legalitas dapur', 'Medium', '2026-06-16', '2026-06-24', 1350000, 'krisna', 42, ['2026-06-16' => 20], 0.96),
+                            $this->task('MBG-T08', 'Implementasi halaman profil perusahaan dan fasilitas dapur', 'High', '2026-06-10', '2026-06-18', 2600000, 'gustra', 56, ['2026-06-16' => 62, '2026-06-18' => 100], 0.95),
+                            $this->task('MBG-T09', 'Implementasi katalog menu MBG dan kapasitas produksi', 'High', '2026-06-14', '2026-06-23', 2150000, 'dwiki', 54, ['2026-06-16' => 32, '2026-06-23' => 100], 0.94),
+                            $this->task('MBG-T10', 'Dokumentasi standar kebersihan dan legalitas dapur', 'Medium', '2026-06-16', '2026-06-24', 1350000, 'krisna', 42, ['2026-06-16' => 20, '2026-06-24' => 100], 0.96),
                         ],
                     ],
                     [
@@ -176,8 +176,8 @@ class DemoProjectManagementSeeder extends Seeder
                         'due_actual' => null,
                         'status' => 'Planned',
                         'tasks' => [
-                            $this->task('MBG-T11', 'Testing form kerja sama dan performa mobile', 'Medium', '2026-06-25', '2026-06-27', 950000, 'divo', 24, [], 1.00),
-                            $this->task('MBG-T12', 'Final deployment dan training update konten MBG', 'High', '2026-06-28', '2026-06-30', 1950000, 'madeadi', 24, [], 1.00),
+                            $this->task('MBG-T11', 'Testing form kerja sama dan performa mobile', 'Medium', '2026-06-25', '2026-06-27', 950000, 'divo', 24, ['2026-06-27' => 100], 1.00),
+                            $this->task('MBG-T12', 'Final deployment dan training update konten MBG', 'High', '2026-06-28', '2026-06-30', 1850000, 'madeadi', 24, ['2026-06-29' => 60, '2026-06-30' => 100], 1.00),
                         ],
                     ],
                 ],

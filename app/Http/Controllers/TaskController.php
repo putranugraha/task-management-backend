@@ -50,6 +50,8 @@ class TaskController extends Controller
                     'dependencies' => 'dependencies.dependsOn',
                     'dependents' => 'dependents.task',
                     'assignments' => 'assignments.user',
+                    'progress_entries' => 'progressEntries.changer',
+                    'cost_entries' => 'costEntries',
                 ];
                 $rels = collect(explode(',', $include))
                     ->map(fn ($s) => trim($s))
@@ -94,6 +96,8 @@ class TaskController extends Controller
                 'dependencies' => 'dependencies.dependsOn',
                 'dependents' => 'dependents.task',
                 'assignments' => 'assignments.user',
+                'progress_entries' => 'progressEntries.changer',
+                'cost_entries' => 'costEntries',
             ];
             $rels = collect(explode(',', $include))
                 ->map(fn ($s) => trim($s))
@@ -193,6 +197,8 @@ class TaskController extends Controller
                 'dependencies' => 'dependencies.dependsOn',
                 'dependents' => 'dependents.task',
                 'assignments' => 'assignments.user',
+                'progress_entries' => 'progressEntries.changer',
+                'cost_entries' => 'costEntries',
             ];
             $rels = collect(explode(',', $include))
                 ->map(fn($s) => trim($s))

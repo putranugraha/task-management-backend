@@ -91,6 +91,45 @@ class TaskResource extends JsonResource
                     ];
                 });
             }),
+            'progress_entries' => $this->whenLoaded('progressEntries', function () {
+                return $this->progressEntries
+                    ->sortBy('progress_date')
+                    ->values()
+                    ->map(function ($entry) {
+                        $changer = $entry->changer;
+
+                        return [
+                            'id' => $entry->id,
+                            'task_id' => $entry->task_id,
+                            'progress_date' => optional($entry->progress_date)->format('Y-m-d'),
+                            'percent_complete' => $entry->percent_complete,
+                            'changed_by' => $entry->changed_by,
+                            'changer' => [
+                                'id' => $changer->id ?? null,
+                                'name' => $changer->name ?? null,
+                            ],
+                            'created_at' => optional($entry->created_at)->toDateTimeString(),
+                            'updated_at' => optional($entry->updated_at)->toDateTimeString(),
+                        ];
+                    });
+            }),
+            'cost_entries' => $this->whenLoaded('costEntries', function () {
+                return $this->costEntries
+                    ->sortBy('incurred_on')
+                    ->values()
+                    ->map(function ($entry) {
+                        return [
+                            'id' => $entry->id,
+                            'task_id' => $entry->task_id,
+                            'incurred_on' => optional($entry->incurred_on)->format('Y-m-d'),
+                            'amount' => (string) ($entry->amount ?? '0.00'),
+                            'category' => $entry->category,
+                            'note' => $entry->note,
+                            'created_at' => optional($entry->created_at)->toDateTimeString(),
+                            'updated_at' => optional($entry->updated_at)->toDateTimeString(),
+                        ];
+                    });
+            }),
             'created_at' => optional($this->created_at)->toDateTimeString(),
             'updated_at' => optional($this->updated_at)->toDateTimeString(),
             'deleted_at' => optional($this->deleted_at)->toDateTimeString(),
