@@ -28,6 +28,7 @@ use App\Repositories\Contracts\RoleRepositoryInterface;
 use App\Repositories\Contracts\StatusHistoryRepositoryInterface;
 use App\Repositories\Contracts\TaskAssignmentRepositoryInterface;
 use App\Repositories\Contracts\TaskBaselineRepositoryInterface;
+use App\Repositories\Contracts\TaskCostEntryRepositoryInterface;
 use App\Repositories\Contracts\TaskDependencyRepositoryInterface;
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Repositories\Contracts\TimeEntryRepositoryInterface;
@@ -45,6 +46,7 @@ use App\Repositories\Eloquent\RoleRepository;
 use App\Repositories\Eloquent\StatusHistoryRepository;
 use App\Repositories\Eloquent\TaskAssignmentRepository;
 use App\Repositories\Eloquent\TaskBaselineRepository;
+use App\Repositories\Eloquent\TaskCostEntryRepository;
 use App\Repositories\Eloquent\TaskDependencyRepository;
 use App\Repositories\Eloquent\TaskRepository;
 use App\Repositories\Eloquent\TimeEntryRepository;
@@ -62,6 +64,7 @@ use App\Services\Contracts\RoleServiceInterface;
 use App\Services\Contracts\StatusHistoryServiceInterface;
 use App\Services\Contracts\TaskAssignmentServiceInterface;
 use App\Services\Contracts\TaskBaselineServiceInterface;
+use App\Services\Contracts\TaskCostEntryServiceInterface;
 use App\Services\Contracts\TaskDependencyServiceInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use App\Services\Contracts\TimeEntryServiceInterface;
@@ -81,6 +84,7 @@ use App\Services\Implementations\RoleService;
 use App\Services\Implementations\StatusHistoryService;
 use App\Services\Implementations\TaskAssignmentService;
 use App\Services\Implementations\TaskBaselineService;
+use App\Services\Implementations\TaskCostEntryService;
 use App\Services\Implementations\TaskDependencyService;
 use App\Services\Implementations\TaskService;
 use App\Services\Implementations\TimeEntryService;
@@ -112,6 +116,9 @@ class AppServiceProvider extends ServiceProvider
         // Bind TaskBaseline interfaces to implementations
         $this->app->bind(TaskBaselineRepositoryInterface::class, TaskBaselineRepository::class);
         $this->app->bind(TaskBaselineServiceInterface::class, TaskBaselineService::class);
+        // Bind TaskCostEntry interfaces to implementations
+        $this->app->bind(TaskCostEntryRepositoryInterface::class, TaskCostEntryRepository::class);
+        $this->app->bind(TaskCostEntryServiceInterface::class, TaskCostEntryService::class);
         // Bind Role interfaces to implementations
         $this->app->bind(RoleRepositoryInterface::class, RoleRepository::class);
         $this->app->bind(RoleServiceInterface::class, RoleService::class);

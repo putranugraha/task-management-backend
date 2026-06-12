@@ -810,9 +810,11 @@ app/Http/Controllers/ProjectController.php
 app/Http/Controllers/TaskController.php
 app/Services/Implementations/ProjectService.php
 app/Services/Implementations/TaskService.php
+app/Services/Implementations/TaskCostEntryService.php
 app/Services/Implementations/EvmService.php
 app/Services/Implementations/EvmCostService.php
 app/Services/Implementations/KpiSnapshotService.php
+app/Repositories/Eloquent/TaskCostEntryRepository.php
 app/Notifications/TaskActivityNotification.php
 app/Console/Commands/SendTaskDeadlineNotifications.php
 ```

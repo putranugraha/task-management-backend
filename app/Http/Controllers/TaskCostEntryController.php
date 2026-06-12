@@ -6,11 +6,18 @@ use App\Http\Requests\TaskCostEntryStoreRequest;
 use App\Http\Resources\TaskCostEntryResource;
 use App\Models\Task;
 use App\Models\TaskCostEntry;
+use App\Services\Contracts\TaskCostEntryServiceInterface;
 use Illuminate\Http\Request;
-use App\Support\TaskHistoryLogger;
 
 class TaskCostEntryController extends Controller
 {
+    protected TaskCostEntryServiceInterface $service;
+
+    public function __construct(TaskCostEntryServiceInterface $service)
+    {
+        $this->service = $service;
+    }
+
     /**
      * GET /api/tasks/{task}/cost-entries
      * Optional query params:
@@ -19,23 +26,13 @@ class TaskCostEntryController extends Controller
      */
     public function index(Task $task, Request $request)
     {
-        $q = $task->costEntries()->newQuery();
-
         $asOf = $request->query('date');
-        if (is_string($asOf) && $asOf !== '') {
-            $q->whereDate('incurred_on', '<=', $asOf);
-        }
-
         $limit = (int) $request->query('limit', 200);
-        if ($limit < 1) $limit = 1;
-        if ($limit > 200) $limit = 200;
-
-        $rows = $q
-            ->where('task_id', $task->id)
-            ->orderByDesc('incurred_on')
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get();
+        $rows = $this->service->getCostEntriesByTask(
+            $task,
+            is_string($asOf) ? $asOf : null,
+            $limit,
+        );
 
         return TaskCostEntryResource::collection($rows);
     }
@@ -45,23 +42,15 @@ class TaskCostEntryController extends Controller
      */
     public function store(Task $task, TaskCostEntryStoreRequest $request)
     {
-        $data = $request->validated();
-        $data['task_id'] = $task->id;
+        $row = $this->service->createCostEntry(
+            $task,
+            $request->validated(),
+            $request->user()?->id,
+        );
 
-        $row = $task->costEntries()->create($data);
-
-        $actorId = $request->user()?->id;
-        $amount = $row->amount ?? null;
-        $category = $row->category ?? null;
-        $date = $row->incurred_on ?? null;
-        $note = 'Cost entry ditambahkan'.($date ? (': '.$date) : '');
-        if ($amount !== null) {
-            $note .= ' (amount: '.$amount.')';
+        if (!$row) {
+            return response()->json(['message' => 'Gagal membuat cost entry'], 400);
         }
-        if ($category) {
-            $note .= ' (kategori: '.$category.')';
-        }
-        TaskHistoryLogger::log($task, $actorId, $note);
 
         return new TaskCostEntryResource($row);
     }
@@ -71,25 +60,11 @@ class TaskCostEntryController extends Controller
      */
     public function destroy(Task $task, TaskCostEntry $costEntry)
     {
-        if ((int) $costEntry->task_id !== (int) $task->id) {
+        $deleted = $this->service->deleteCostEntry($task, $costEntry, request()->user()?->id);
+
+        if (!$deleted) {
             abort(404);
         }
-
-        $actorId = request()->user()?->id;
-        $amount = $costEntry->amount ?? null;
-        $category = $costEntry->category ?? null;
-        $date = $costEntry->incurred_on ?? null;
-
-        $costEntry->delete();
-
-        $note = 'Cost entry dihapus'.($date ? (': '.$date) : '');
-        if ($amount !== null) {
-            $note .= ' (amount: '.$amount.')';
-        }
-        if ($category) {
-            $note .= ' (kategori: '.$category.')';
-        }
-        TaskHistoryLogger::log($task, $actorId, $note);
 
         return response()->json(['message' => 'Cost entry berhasil dihapus']);
     }

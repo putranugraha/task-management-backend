@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\StatusHistory;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use App\Models\TaskCostEntry;
 use App\Models\User;
 use App\Notifications\TaskActivityNotification;
 use App\Repositories\Eloquent\MilestoneRepository;
@@ -248,5 +249,68 @@ class ArchiveBehaviorTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $matchingHistory->id)
             ->assertJsonPath('data.0.task_id', $firstTask->id);
+    }
+
+    public function test_task_cost_entry_endpoints_use_task_scope_and_write_history(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo(Permission::findOrCreate('melihat project', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('mengubah project', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('menghapus project', 'web'));
+        Sanctum::actingAs($user);
+
+        $task = Task::factory()->create();
+        $otherTask = Task::factory()->create();
+
+        TaskCostEntry::create([
+            'task_id' => $otherTask->id,
+            'incurred_on' => '2026-06-09',
+            'amount' => 25000,
+            'category' => 'Other',
+            'note' => 'Should not appear',
+        ]);
+
+        $createResponse = $this->postJson("/api/tasks/{$task->id}/cost-entries", [
+            'incurred_on' => '2026-06-10',
+            'amount' => 125000,
+            'category' => 'Transport',
+            'note' => 'Test cost entry',
+        ]);
+
+        $createResponse
+            ->assertCreated()
+            ->assertJsonPath('data.task_id', $task->id)
+            ->assertJsonPath('data.category', 'Transport');
+
+        $this->assertDatabaseHas('task_cost_entries', [
+            'task_id' => $task->id,
+            'category' => 'Transport',
+        ]);
+
+        $this->assertDatabaseHas('status_histories', [
+            'task_id' => $task->id,
+            'changed_by' => $user->id,
+            'note' => 'Cost entry ditambahkan: 2026-06-10 (amount: 125000.00) (kategori: Transport)',
+        ]);
+
+        $this->getJson("/api/tasks/{$task->id}/cost-entries")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.task_id', $task->id);
+
+        $costEntryId = $createResponse->json('data.id');
+
+        $this->deleteJson("/api/tasks/{$task->id}/cost-entries/{$costEntryId}")
+            ->assertOk();
+
+        $this->assertDatabaseMissing('task_cost_entries', [
+            'id' => $costEntryId,
+        ]);
+
+        $this->assertDatabaseHas('status_histories', [
+            'task_id' => $task->id,
+            'changed_by' => $user->id,
+            'note' => 'Cost entry dihapus: 2026-06-10 (amount: 125000.00) (kategori: Transport)',
+        ]);
     }
 }

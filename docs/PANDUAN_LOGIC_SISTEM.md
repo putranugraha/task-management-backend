@@ -1190,6 +1190,21 @@ File backend:
 
 ```text
 D:\TA 2\task-management-copy\app\Http\Controllers\TaskCostEntryController.php
+D:\TA 2\task-management-copy\app\Services\Implementations\TaskCostEntryService.php
+D:\TA 2\task-management-copy\app\Repositories\Eloquent\TaskCostEntryRepository.php
+D:\TA 2\task-management-copy\app\Models\TaskCostEntry.php
+```
+
+Alur create cost entry:
+
+```text
+POST /api/tasks/{task}/cost-entries
+  -> TaskCostEntryController::store()
+  -> TaskCostEntryStoreRequest validasi input
+  -> TaskCostEntryService::createCostEntry()
+  -> TaskCostEntryRepository::createCostEntry()
+  -> TaskHistoryLogger mencatat aktivitas cost entry ke status_histories
+  -> TaskCostEntryResource mengembalikan response JSON
 ```
 
 Tabel:
@@ -1693,8 +1708,10 @@ app/Services/Implementations/ProjectService.php
 app/Services/Implementations/TaskService.php
 app/Services/Implementations/EvmService.php
 app/Services/Implementations/EvmCostService.php
+app/Services/Implementations/TaskCostEntryService.php
 app/Repositories/Eloquent/ProjectRepository.php
 app/Repositories/Eloquent/TaskRepository.php
+app/Repositories/Eloquent/TaskCostEntryRepository.php
 app/Notifications/TaskActivityNotification.php
 app/Console/Commands/SendTaskDeadlineNotifications.php
 app/Models/User.php
