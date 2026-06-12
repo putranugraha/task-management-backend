@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Attachment;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\StatusHistory;
 use App\Models\Task;
 use App\Models\TaskAssignment;
 use App\Models\User;
@@ -18,6 +19,8 @@ use App\Services\Contracts\KpiSnapshotServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -215,5 +218,35 @@ class ArchiveBehaviorTest extends TestCase
         Notification::assertSentTo($taskAssignee, TaskActivityNotification::class);
         Notification::assertSentTo($projectMember, TaskActivityNotification::class);
         Notification::assertNotSentTo($outsideUser, TaskActivityNotification::class);
+    }
+
+    public function test_nested_task_status_histories_are_filtered_to_the_requested_task(): void
+    {
+        $viewer = User::factory()->create();
+        $viewer->givePermissionTo(Permission::findOrCreate('melihat tugas', 'web'));
+        Sanctum::actingAs($viewer);
+
+        $firstTask = Task::factory()->create();
+        $secondTask = Task::factory()->create();
+
+        $matchingHistory = StatusHistory::factory()->create([
+            'task_id' => $firstTask->id,
+            'from_status' => 'To Do',
+            'to_status' => 'In Progress',
+        ]);
+
+        StatusHistory::factory()->create([
+            'task_id' => $secondTask->id,
+            'from_status' => 'To Do',
+            'to_status' => 'Done',
+        ]);
+
+        $response = $this->getJson("/api/tasks/{$firstTask->id}/status-histories");
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $matchingHistory->id)
+            ->assertJsonPath('data.0.task_id', $firstTask->id);
     }
 }

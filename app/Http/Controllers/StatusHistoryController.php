@@ -18,16 +18,16 @@ class StatusHistoryController extends Controller
 
     public function index(Request $request)
     {
-        $routeTask = $request->route('task');
+        $routeTaskId = $this->routeEntityId($request->route('task'));
         $actorId = $request->query('actor_id');
         $entityType = $request->query('entity_type');
-        $entityId = $request->query('entity_id', is_scalar($routeTask) ? $routeTask : null);
+        $entityId = $request->query('entity_id', $routeTaskId);
         $start = $request->query('start_date');
         $end = $request->query('end_date');
         $include = $request->query('include'); // e.g., "task,changer"
 
         // Laporan range tanggal murni (tanpa entity/actor) tetap non-paginated
-        if ($start && $end && !$actorId && !$entityType && !$entityId && !$routeTask) {
+        if ($start && $end && !$actorId && !$entityType && !$entityId && !$routeTaskId) {
             $items = $this->service->getHistoriesByDateRange($start, $end);
 
             if ($include) {
@@ -53,9 +53,9 @@ class StatusHistoryController extends Controller
         // Path default: pagination dengan filter sederhana
         $filters = [];
 
-        if ($request->routeIs('*status-histories') && $routeTask) {
+        if ($routeTaskId !== null) {
             $filters['entity_type'] = 'Task';
-            $filters['entity_id'] = $routeTask;
+            $filters['entity_id'] = $routeTaskId;
         } elseif ($entityType && $entityId) {
             $filters['entity_type'] = $entityType;
             $filters['entity_id'] = $entityId;
@@ -92,6 +92,19 @@ class StatusHistoryController extends Controller
         }
 
         return StatusHistoryResource::collection($items);
+    }
+
+    protected function routeEntityId(mixed $value): int|string|null
+    {
+        if (is_object($value) && isset($value->id)) {
+            return $value->id;
+        }
+
+        if (is_scalar($value) && $value !== '') {
+            return $value;
+        }
+
+        return null;
     }
 
     public function store(StatusHistoryStoreRequest $request)
