@@ -89,17 +89,11 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
             $end = $totalDays > 0 ? Carbon::parse($start)->copy()->addDays($totalDays) : Carbon::parse($start)->copy();
             $projectValue = max(0.0, (float) ($project->value_amount ?? 0));
             $totalTaskBudget = max(0.0, (float) $tasks->sum('budget_cost'));
-            $budgetScale = ($projectValue > 0 && $totalTaskBudget > 0)
-                ? $projectValue / $totalTaskBudget
-                : 1.0;
-            $remainingBaselineBudget = $projectValue > 0 ? $projectValue : null;
-            $taskCount = $tasks->count();
-            $taskIndex = 0;
 
             // Respect FE-provided base dates; fallback to computed values if absent
             $data['start_planned_base'] = $data['start_planned_base'] ?? Carbon::parse($start)->toDateString();
             $data['end_planned_base'] = $data['end_planned_base'] ?? Carbon::parse($end)->toDateString();
-            $data['value_amount_base'] = $data['value_amount_base'] ?? $projectValue;
+            $data['value_amount_base'] = $data['value_amount_base'] ?? ($totalTaskBudget > 0 ? $totalTaskBudget : $projectValue);
 
             // Default taken_at to now if missing (request still requires it, but be defensive)
             if (empty($data['taken_at'])) {
@@ -113,7 +107,6 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
 
             // Generate task_baselines snapshot for each task
             foreach ($tasks as $task) {
-                $taskIndex++;
                 // Inclusive duration from dates; fallback to task->duration_planned
                 $duration = null;
                 if ($task->start_planned && $task->end_planned) {
@@ -130,14 +123,6 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
                 }
 
                 $budgetCostBase = max(0.0, (float) ($task->budget_cost ?? 0));
-                if ($projectValue > 0 && $totalTaskBudget > 0) {
-                    if ($taskIndex === $taskCount) {
-                        $budgetCostBase = max(0.0, (float) $remainingBaselineBudget);
-                    } else {
-                        $budgetCostBase = round($budgetCostBase * $budgetScale, 2);
-                        $remainingBaselineBudget = max(0.0, (float) $remainingBaselineBudget - $budgetCostBase);
-                    }
-                }
 
                 $plannedEffortHours = (float) ($assignmentEffortByTask[$task->id] ?? 0);
                 if ($plannedEffortHours <= 0 && $duration) {
@@ -195,4 +180,3 @@ class ProjectBaselineService implements ProjectBaselineServiceInterface
         }
     }
 }
-

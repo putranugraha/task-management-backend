@@ -20,22 +20,37 @@ class EvmCostService implements EvmCostServiceInterface
 
         $project = Project::findOrFail($projectId);
         // Validate that baseline belongs to the project (if provided)
+        $baseline = null;
         if ($baselineId) {
-            $baselineOk = ProjectBaseline::where('project_id', $projectId)
+            $baseline = ProjectBaseline::where('project_id', $projectId)
                 ->where('id', $baselineId)
-                ->exists();
-            if (! $baselineOk) {
+                ->first();
+            if (! $baseline) {
                 // Treat as invalid request - the caller validated "exists", but it can belong to another project.
                 abort(422, 'Invalid baseline_id for this project.');
             }
         }
 
-        $tasks = Task::query()
+        // When a baseline is selected, only tasks captured in that baseline are part of the baseline calculation.
+        $tasksQuery = Task::query()
             ->where('project_id', $projectId)
             ->where(function ($query) {
                 $query->whereNull('milestone_id')
                     ->orWhereHas('milestone');
-            })
+            });
+
+        if ($baselineId) {
+            $tasksQuery
+                ->whereHas('baselines', function ($query) use ($baselineId) {
+                    $query->where('baseline_id', $baselineId);
+                });
+
+            if ($baseline?->taken_at) {
+                $tasksQuery->where('created_at', '<=', $baseline->taken_at);
+            }
+        }
+
+        $tasks = $tasksQuery
             ->get([
                 'id',
                 'project_id',
@@ -43,6 +58,7 @@ class EvmCostService implements EvmCostServiceInterface
                 'duration_planned',
                 'percent_complete',
                 'budget_cost',
+                'created_at',
             ]);
 
         $taskIds = $tasks->pluck('id')->all();

@@ -47,15 +47,29 @@ class EvmService implements EvmServiceInterface
         }
         $baselineId = $baseline->id ?? null;
 
-        // Fetch tasks for project (minimal columns)
-        $tasks = Task::query()
+        // Fetch tasks for project (minimal columns).
+        // When a baseline is selected, only tasks captured in that baseline are part of the baseline calculation.
+        $tasksQuery = Task::query()
             ->where('project_id', $projectId)
             ->where(function ($query) {
                 $query->whereNull('milestone_id')
                     ->orWhereHas('milestone');
-            })
+            });
+
+        if ($baselineId) {
+            $tasksQuery
+                ->whereHas('baselines', function ($query) use ($baselineId) {
+                    $query->where('baseline_id', $baselineId);
+                });
+
+            if ($baseline?->taken_at) {
+                $tasksQuery->where('created_at', '<=', $baseline->taken_at);
+            }
+        }
+
+        $tasks = $tasksQuery
             ->get([
-                'id', 'project_id', 'start_planned', 'end_planned', 'duration_planned', 'percent_complete',
+                'id', 'project_id', 'start_planned', 'end_planned', 'duration_planned', 'percent_complete', 'created_at',
             ]);
 
         $taskIds = $tasks->pluck('id')->all();

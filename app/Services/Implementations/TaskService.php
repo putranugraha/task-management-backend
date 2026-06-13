@@ -4,7 +4,6 @@ namespace App\Services\Implementations;
 
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Services\Contracts\ProjectBaselineServiceInterface;
-use App\Services\Contracts\TaskBaselineServiceInterface;
 use App\Services\Contracts\TaskServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use App\Models\User;
@@ -21,7 +20,6 @@ use Carbon\Carbon;
 class TaskService implements TaskServiceInterface
 {
     protected TaskRepositoryInterface $repository;
-    protected TaskBaselineServiceInterface $taskBaselineService;
     protected ProjectBaselineServiceInterface $projectBaselineService;
 
     const CACHE_ALL = 'tasks.all';
@@ -42,10 +40,9 @@ class TaskService implements TaskServiceInterface
      */
     const DONE_STATUSES_FOR_MILESTONE = ['Done'];
 
-    public function __construct(TaskRepositoryInterface $repository, TaskBaselineServiceInterface $taskBaselineService, ProjectBaselineServiceInterface $projectBaselineService)
+    public function __construct(TaskRepositoryInterface $repository, ProjectBaselineServiceInterface $projectBaselineService)
     {
         $this->repository = $repository;
-        $this->taskBaselineService = $taskBaselineService;
         $this->projectBaselineService = $projectBaselineService;
     }
 
@@ -207,21 +204,16 @@ class TaskService implements TaskServiceInterface
             // Ensure progress history has a baseline snapshot for today (even when created with non-zero progress).
             $this->recordProgressEntryForToday($task);
 
-            // Ensure a project baseline exists; create if missing
+            // Ensure a project baseline exists for brand-new projects only.
+            // Existing baselines are immutable snapshots; new tasks must not be inserted into them automatically.
             $latest = $this->projectBaselineService->getLatestBaselineByProject($task->project_id);
             if (!$latest) {
-                $latest = $this->projectBaselineService->createBaseline([
+                $this->projectBaselineService->createBaseline([
                     'project_id' => $task->project_id,
                     'baseline_name' => 'Initial Baseline',
                     'taken_at' => Carbon::now(),
                 ]);
             }
-
-            // Auto-snapshot this task into (latest) baseline
-            $this->taskBaselineService->createTaskBaseline([
-                // let service choose latest baseline if none passed
-                'task_id' => $task->id,
-            ]);
         }
 
         $this->clearCaches($task->id ?? null, $task->status ?? null, $task->project_id ?? null, $task->priority ?? null, $task->milestone_id ?? null);

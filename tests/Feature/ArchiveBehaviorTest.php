@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Attachment;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\ProjectBaseline;
 use App\Models\StatusHistory;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use App\Models\TaskBaseline;
 use App\Models\TaskCostEntry;
 use App\Models\User;
 use App\Notifications\TaskActivityNotification;
@@ -17,6 +19,9 @@ use App\Repositories\Eloquent\TaskRepository;
 use App\Services\Contracts\EvmCostServiceInterface;
 use App\Services\Contracts\EvmServiceInterface;
 use App\Services\Contracts\KpiSnapshotServiceInterface;
+use App\Services\Contracts\ProjectBaselineServiceInterface;
+use App\Services\Contracts\TaskServiceInterface;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -173,6 +178,251 @@ class ArchiveBehaviorTest extends TestCase
         $snapshot = app(KpiSnapshotServiceInterface::class)->generateForProjectAndDate($project->id, '2026-06-03');
 
         $this->assertSame(1, (int) $snapshot->tasks_total);
+    }
+
+    public function test_baseline_evm_excludes_tasks_created_after_the_baseline(): void
+    {
+        $project = Project::factory()->create(['value_amount' => 1_000_000]);
+        $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+        $baselineTask = Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'start_planned' => '2026-06-13',
+            'end_planned' => '2026-06-14',
+            'duration_planned' => 2,
+            'percent_complete' => 100,
+            'budget_cost' => 200_000,
+            'created_at' => '2026-06-13 07:00:00',
+        ]);
+
+        TaskAssignment::factory()->create([
+            'task_id' => $baselineTask->id,
+            'estimated_effort_hours' => 16,
+        ]);
+
+        $baseline = ProjectBaseline::create([
+            'project_id' => $project->id,
+            'baseline_name' => 'Initial Baseline',
+            'taken_at' => '2026-06-13 08:00:00',
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-19',
+        ]);
+
+        TaskBaseline::create([
+            'baseline_id' => $baseline->id,
+            'task_id' => $baselineTask->id,
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-14',
+            'duration_planned_base' => 2,
+            'planned_effort_hours' => 16,
+            'budget_cost_base' => 200_000,
+        ]);
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'start_planned' => '2026-06-15',
+            'end_planned' => '2026-06-16',
+            'duration_planned' => 2,
+            'percent_complete' => 0,
+            'budget_cost' => 300_000,
+            'created_at' => '2026-06-14 08:00:00',
+        ]);
+
+        $effort = app(EvmServiceInterface::class)->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+        $cost = app(EvmCostServiceInterface::class)->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+
+        $this->assertSame(1, $effort['meta']['task_count']);
+        $this->assertSame(1, $cost['meta']['task_count']);
+        $this->assertSame(200000.0, $cost['bac']);
+    }
+
+    public function test_creating_task_does_not_mutate_existing_project_baseline(): void
+    {
+        $project = Project::factory()->create(['value_amount' => 1_000_000]);
+        $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+        $baselineTask = Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'start_planned' => '2026-06-13',
+            'end_planned' => '2026-06-14',
+            'duration_planned' => 2,
+            'percent_complete' => 100,
+            'budget_cost' => 400_000,
+            'created_at' => '2026-06-13 07:00:00',
+        ]);
+
+        TaskAssignment::factory()->create([
+            'task_id' => $baselineTask->id,
+            'estimated_effort_hours' => 16,
+        ]);
+
+        $baseline = ProjectBaseline::create([
+            'project_id' => $project->id,
+            'baseline_name' => 'Baseline Sebelum Task Baru',
+            'taken_at' => '2026-06-13 08:00:00',
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-19',
+        ]);
+
+        TaskBaseline::create([
+            'baseline_id' => $baseline->id,
+            'task_id' => $baselineTask->id,
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-14',
+            'duration_planned_base' => 2,
+            'planned_effort_hours' => 16,
+            'budget_cost_base' => 400_000,
+        ]);
+
+        Carbon::setTestNow('2026-06-14 08:00:00');
+        try {
+            $newTask = app(TaskServiceInterface::class)->createTask([
+                'project_id' => $project->id,
+                'milestone_id' => $milestone->id,
+                'title' => 'Task baru setelah baseline',
+                'status' => 'To Do',
+                'priority' => 'Medium',
+                'start_planned' => '2026-06-15',
+                'end_planned' => '2026-06-16',
+                'duration_planned' => 2,
+                'percent_complete' => 0,
+                'budget_cost' => 600_000,
+            ]);
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertNotNull($newTask);
+        $this->assertDatabaseMissing('task_baselines', [
+            'baseline_id' => $baseline->id,
+            'task_id' => $newTask->id,
+        ]);
+
+        $effort = app(EvmServiceInterface::class)->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+        $cost = app(EvmCostServiceInterface::class)->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+
+        $this->assertSame(1, $effort['meta']['task_count']);
+        $this->assertSame(1, $cost['meta']['task_count']);
+        $this->assertSame(400000.0, $cost['bac']);
+    }
+
+    public function test_new_project_baseline_uses_current_total_task_budget_for_cost_bac(): void
+    {
+        $project = Project::factory()->create([
+            'value_amount' => 1_000_000,
+            'start_planned' => '2026-06-13',
+        ]);
+        $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'start_planned' => '2026-06-13',
+            'end_planned' => '2026-06-14',
+            'duration_planned' => 2,
+            'budget_cost' => 1_000_000,
+            'created_at' => '2026-06-13 07:00:00',
+        ]);
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'start_planned' => '2026-06-15',
+            'end_planned' => '2026-06-16',
+            'duration_planned' => 2,
+            'budget_cost' => 300_000,
+            'created_at' => '2026-06-13 07:30:00',
+        ]);
+
+        $baseline = app(ProjectBaselineServiceInterface::class)->createBaseline([
+            'project_id' => $project->id,
+            'baseline_name' => 'Baseline Total Task 1,3 Juta',
+            'taken_at' => '2026-06-13 08:00:00',
+        ]);
+
+        $this->assertNotNull($baseline);
+        $this->assertSame(1300000.0, (float) $baseline->value_amount_base);
+        $this->assertSame(1300000.0, (float) TaskBaseline::where('baseline_id', $baseline->id)->sum('budget_cost_base'));
+
+        $cost = app(EvmCostServiceInterface::class)->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+
+        $this->assertSame(2, $cost['meta']['task_count']);
+        $this->assertSame(1300000.0, $cost['bac']);
+    }
+
+    public function test_updating_task_does_not_mutate_existing_task_baseline_snapshot(): void
+    {
+        $project = Project::factory()->create([
+            'value_amount' => 1_000_000,
+            'start_planned' => '2026-06-13',
+        ]);
+        $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+        $user = User::factory()->create();
+
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'title' => 'Task sebelum update',
+            'start_planned' => '2026-06-13',
+            'end_planned' => '2026-06-14',
+            'duration_planned' => 2,
+            'percent_complete' => 50,
+            'budget_cost' => 400_000,
+            'created_at' => '2026-06-13 07:00:00',
+        ]);
+
+        $baseline = ProjectBaseline::create([
+            'project_id' => $project->id,
+            'baseline_name' => 'Baseline Sebelum Update Task',
+            'taken_at' => '2026-06-13 08:00:00',
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-19',
+            'value_amount_base' => 400_000,
+        ]);
+
+        $taskBaseline = TaskBaseline::create([
+            'baseline_id' => $baseline->id,
+            'task_id' => $task->id,
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-14',
+            'duration_planned_base' => 2,
+            'planned_effort_hours' => 16,
+            'budget_cost_base' => 400_000,
+        ]);
+
+        app(TaskServiceInterface::class)->updateTask($task->id, [
+            'title' => 'Task setelah update',
+            'start_planned' => '2026-06-15',
+            'end_planned' => '2026-06-17',
+            'duration_planned' => 3,
+            'budget_cost' => 900_000,
+            'assignments' => [
+                [
+                    'user_id' => $user->id,
+                    'role_on_task' => 'Developer',
+                    'estimated_effort_hours' => 40,
+                ],
+            ],
+        ]);
+
+        $taskBaseline->refresh();
+
+        $this->assertSame('2026-06-13', Carbon::parse($taskBaseline->start_planned_base)->toDateString());
+        $this->assertSame('2026-06-14', Carbon::parse($taskBaseline->end_planned_base)->toDateString());
+        $this->assertSame(2, (int) $taskBaseline->duration_planned_base);
+        $this->assertSame(16.0, (float) $taskBaseline->planned_effort_hours);
+        $this->assertSame(400000.0, (float) $taskBaseline->budget_cost_base);
+
+        $effort = app(EvmServiceInterface::class)->computeForProjectDate($project->id, '2026-06-17', $baseline->id);
+        $cost = app(EvmCostServiceInterface::class)->computeForProjectDate($project->id, '2026-06-17', $baseline->id);
+
+        $this->assertSame(1, $effort['meta']['task_count']);
+        $this->assertSame(16.0, $effort['pv']);
+        $this->assertSame(1, $cost['meta']['task_count']);
+        $this->assertSame(400000.0, $cost['bac']);
     }
 
     public function test_deadline_notifications_include_task_assignee_project_owner_and_project_members(): void
