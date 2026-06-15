@@ -143,22 +143,20 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus permissions']
 
 
 // Divisions API
-// Read-only for those with 'melihat project'
-Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat divisions'])->group(function () {
     Route::apiResource('divisions', DivisionController::class)->only(['index','show']);
     Route::get('divisions/{division}/users-count', [DivisionController::class, 'usersCount']);
 });
 
-// Manage divisions with project write permissions
-Route::middleware(['auth:sanctum', 'active', 'permission:membuat project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:membuat divisions'])->group(function () {
     Route::apiResource('divisions', DivisionController::class)->only(['store']);
 });
-Route::middleware(['auth:sanctum', 'active', 'permission:mengubah project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:mengubah divisions'])->group(function () {
     Route::apiResource('divisions', DivisionController::class)->only(['update']);
     Route::patch('divisions/{division}/status', [DivisionController::class, 'updateStatus'])->whereNumber('division');
     Route::patch('divisions/{division}/activate', [DivisionController::class, 'activate'])->whereNumber('division');
 });
-Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:menghapus divisions'])->group(function () {
     Route::apiResource('divisions', DivisionController::class)->only(['destroy']);
 });
 // Projects API as apiResource
@@ -224,8 +222,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->g
 });
 
 // Milestones API as apiResource
-// Read-only for those with 'melihat project'
-Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat milestones'])->group(function () {
     // Stats route sebelum apiResource agar tidak tertimpa oleh binding {milestone}
     Route::get('milestones/stats', [MilestoneController::class, 'stats']);
     Route::get('milestones/archived', [MilestoneController::class, 'archived']);
@@ -234,18 +231,17 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->gro
     Route::get('projects/{project}/milestones', [MilestoneController::class, 'indexByProject']);
 });
 
-// Manage milestones with project write permissions
-Route::middleware(['auth:sanctum', 'active', 'permission:membuat project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:membuat milestones'])->group(function () {
     Route::apiResource('milestones', MilestoneController::class)->only(['store']);
     // Nested create by project
     Route::post('projects/{project}/milestones', [MilestoneController::class, 'storeForProject']);
 });
-Route::middleware(['auth:sanctum', 'active', 'permission:mengubah project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:mengubah milestones'])->group(function () {
     Route::apiResource('milestones', MilestoneController::class)->only(['update']);
     Route::patch('milestones/{milestone}/status', [MilestoneController::class, 'updateStatus']);
     Route::patch('milestones/{milestone}/complete', [MilestoneController::class, 'complete']);
 });
-Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:menghapus milestones'])->group(function () {
     Route::apiResource('milestones', MilestoneController::class)->only(['destroy']);
     Route::patch('milestones/{milestone}/restore', [MilestoneController::class, 'restore']);
 });
@@ -354,14 +350,14 @@ Route::middleware(['auth:sanctum', 'active', 'permission:melihat tugas'])->group
 });
 
 // Cost Entries (Actual Cost ledger)
-Route::middleware(['auth:sanctum', 'active', 'permission:melihat project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat biaya aktual'])->group(function () {
     Route::get('tasks/{task}/cost-entries', [TaskCostEntryController::class, 'index']);
 });
 
-Route::middleware(['auth:sanctum', 'active', 'permission:mengubah project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:membuat biaya aktual'])->group(function () {
     Route::post('tasks/{task}/cost-entries', [TaskCostEntryController::class, 'store']);
 });
-Route::middleware(['auth:sanctum', 'active', 'permission:menghapus project'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:menghapus biaya aktual'])->group(function () {
     Route::delete('tasks/{task}/cost-entries/{costEntry}', [TaskCostEntryController::class, 'destroy']);
 });
 
@@ -432,5 +428,4 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus lampiran'])->
     Route::apiResource('attachments', AttachmentController::class)->only(['destroy']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-
 
