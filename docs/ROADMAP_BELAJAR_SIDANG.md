@@ -247,6 +247,7 @@ Aturan sistem:
 - Project, milestone, dan task memakai soft delete.
 - Archive project membuat project tidak tampil di list aktif.
 - Archive milestone membuat task di bawah milestone tersebut tidak dihitung sebagai data aktif.
+- Archive task membuat task tidak dihitung dalam EVM/KPI aktif.
 - Restore task/milestone diblokir jika parent project/milestone masih archived.
 - Permanent delete hanya tersedia untuk project archived.
 - Permanent delete project menghapus project dan relasi turunannya.
@@ -394,6 +395,7 @@ Tujuan Gantt:
 - Menampilkan milestone dan task.
 - Menampilkan dependency antar task.
 - Membantu membaca keterlambatan secara visual.
+- Menampilkan jadwal current plan/terbaru, bukan snapshot baseline lama.
 
 File frontend:
 
@@ -416,6 +418,7 @@ Kalimat sidang:
 
 ```text
 Gantt Chart di sistem ini bukan hanya visual statis, tetapi terhubung dengan data task, milestone, jadwal, progress, dan dependency yang tersimpan di database.
+Gantt sengaja memakai data task terbaru agar perubahan jadwal, task baru, dan dependency terbaru langsung terlihat. Baseline dipakai untuk pembanding EVM, bukan untuk mengganti tampilan Gantt current.
 ```
 
 ## 10. Baseline
@@ -426,8 +429,11 @@ Dipakai untuk:
 
 - Menyimpan jadwal awal project.
 - Menyimpan jadwal awal task.
+- Menyimpan planned effort dan budget task pada saat baseline dibuat.
 - Menjadi pembanding ketika jadwal task berubah.
 - Mendukung perhitungan EVM.
+- Bersifat immutable: task baru atau update task tidak mengubah baseline lama.
+- Jika ingin perubahan task ikut dihitung sebagai rencana baru, user membuat baseline baru.
 
 Tabel:
 
@@ -448,6 +454,7 @@ Kalimat sidang:
 
 ```text
 Baseline dibutuhkan agar sistem tetap bisa membandingkan progress sekarang dengan rencana awal, walaupun jadwal task sudah pernah diubah.
+Baseline lama tidak otomatis berubah ketika task diedit atau task baru dibuat. Baseline baru akan mengambil snapshot kondisi task terbaru, termasuk total budget task terbaru.
 ```
 
 ## 11. EVM Effort-Based
@@ -456,9 +463,11 @@ EVM effort-based menghitung performa berdasarkan jam kerja.
 
 Data yang dipakai:
 
-- Planned effort dari `task_assignments.estimated_effort_hours`.
+- Jika baseline dipilih, planned effort dari `task_baselines.planned_effort_hours`.
+- Jika tidak ada baseline, planned effort dari `task_assignments.estimated_effort_hours`.
+- Jika effort assignment kosong, fallback dari `duration_planned * 8 jam`.
 - Actual effort dari `time_entries.hours`.
-- Percent complete dari `tasks.percent_complete`.
+- Percent complete historis dari `task_progress_entries` sampai tanggal as-of, fallback ke current progress untuk hari ini.
 
 Rumus:
 
@@ -493,8 +502,8 @@ EVM cost-based menghitung performa berdasarkan biaya/rupiah.
 
 Data yang dipakai:
 
-- BAC dari `projects.value_amount` atau total `tasks.budget_cost`.
-- PV dan EV dari `tasks.budget_cost`.
+- Jika baseline dipilih, BAC/PV/EV dari snapshot `task_baselines.budget_cost_base`.
+- Jika tidak ada baseline, BAC dari nilai project atau total `tasks.budget_cost`, dan PV/EV dari `tasks.budget_cost`.
 - AC dari `task_cost_entries.amount`.
 - Progress historis dari `task_progress_entries`.
 
@@ -789,6 +798,7 @@ Jawaban:
 
 ```text
 Baseline menyimpan rencana awal. Jika jadwal task berubah, sistem tetap bisa membandingkan progress saat ini dengan rencana awal.
+Baseline lama tidak berubah ketika task dibuat atau diedit. Jika ada perubahan scope atau budget yang ingin dijadikan rencana baru, user membuat baseline baru.
 ```
 
 ## 20. File Prioritas untuk Dibaca

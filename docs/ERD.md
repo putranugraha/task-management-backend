@@ -352,7 +352,7 @@ erDiagram
 - `users n..m roles` dan `users n..m permissions` dikelola package Spatie Permission lewat tabel pivot polymorphic.
 - `projects`, `milestones`, dan `tasks` memakai soft delete lewat kolom `deleted_at`, sehingga data bisa masuk archive dan direstore.
 - `roles`, `permissions`, dan `divisions` memiliki kolom `status` untuk menonaktifkan data tanpa menghapusnya.
-- `project_baselines.value_amount_base` dan `task_baselines.budget_cost_base` menyimpan snapshot biaya agar EVM cost-based bisa memakai nilai baseline.
+- `project_baselines.value_amount_base` dan `task_baselines.budget_cost_base` menyimpan snapshot biaya agar EVM cost-based bisa memakai nilai baseline. Saat baseline baru dibuat, nilai ini mengikuti total budget task aktif pada saat itu, bukan memaksa sama dengan nilai project lama.
 
 ## Catatan Tabel Sistem
 
@@ -369,3 +369,5 @@ erDiagram
 - `comments` dan `attachments` tidak punya FK langsung ke `tasks`, `milestones`, atau `projects` karena desainnya polymorphic.
 - `kpi_snapshots` menyimpan hasil hitung KPI, bukan sumber data utama. Sumber hitungnya tetap dari `tasks` dan `reporting_periods`.
 - `task_baselines.baseline_id` akhirnya nullable karena ada migration yang mengubah FK menjadi `nullOnDelete`.
+- Baseline bersifat snapshot historis. Task baru atau update task tidak otomatis mengubah `task_baselines` lama; perubahan masuk ke baseline hanya jika user membuat baseline baru.
+- Gantt Chart membaca data task current/terbaru, sedangkan EVM baseline membaca data dari `task_baselines`.

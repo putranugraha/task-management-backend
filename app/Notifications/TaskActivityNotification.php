@@ -93,7 +93,7 @@ class TaskActivityNotification extends Notification
     private function mailSubject(string $taskTitle): string
     {
         return match ($this->eventType) {
-            'task_assigned' => 'Task baru ditugaskan: '.$taskTitle,
+            'task_a+ssigned' => 'Task baru ditugaskan: '.$taskTitle,
             'comment_added' => 'Komentar baru pada task: '.$taskTitle,
             'attachment_uploaded' => 'Lampiran baru pada task: '.$taskTitle,
             'attachment_approved' => 'Lampiran disetujui: '.$taskTitle,

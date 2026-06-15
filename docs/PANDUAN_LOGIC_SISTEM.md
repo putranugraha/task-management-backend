@@ -925,6 +925,8 @@ D:\TA 2\fe-task-management-copy\src\lib\api\tasks.ts
 
 Tujuannya agar Gantt bisa menggambar garis dependency.
 
+Gantt Chart memakai data task terbaru/current plan. Jadi jika task baru dibuat, jadwal task diedit, atau dependency berubah, Gantt langsung mengikuti kondisi terbaru. Baseline tidak dipakai untuk mengganti tampilan Gantt, karena baseline berfungsi sebagai snapshot pembanding EVM.
+
 ### 9.3 Logic menggambar dependency
 
 File:
@@ -998,11 +1000,12 @@ GET /api/projects/{project}/evm?date=YYYY-MM-DD&baseline_id=ID
 
 EVM effort-based memakai:
 
-- `task_assignments.estimated_effort_hours` sebagai planned effort utama
-- `task_baselines.planned_effort_hours` sebagai fallback
-- `duration_planned * 8 jam` sebagai fallback terakhir
-- `time_entries.hours` sebagai actual cost/actual effort
-- `tasks.percent_complete` sebagai progress
+- Jika baseline dipilih, `task_baselines.planned_effort_hours` sebagai planned effort snapshot.
+- Jika baseline tidak dipilih, `task_assignments.estimated_effort_hours` sebagai planned effort current.
+- `duration_planned * 8 jam` sebagai fallback terakhir jika effort assignment kosong.
+- `time_entries.hours` sebagai actual effort.
+- `task_progress_entries.percent_complete` sebagai progress historis sampai tanggal EVM.
+- `tasks.percent_complete` hanya dipakai sebagai fallback untuk query hari ini jika progress history belum ada.
 
 ### 10.2 Rumus effort-based
 
@@ -1016,6 +1019,20 @@ SV = EV - PV
 SPI = EV / PV
 CV = EV - AC
 CPI = EV / AC
+```
+
+Jika baseline dipilih:
+
+```text
+Planned Effort = task_baselines.planned_effort_hours
+Start/Duration = start_planned_base dan duration_planned_base
+```
+
+Jika baseline tidak dipilih:
+
+```text
+Planned Effort = sum(task_assignments.estimated_effort_hours)
+Fallback = duration_planned * 8 jam
 ```
 
 Di code:
@@ -1074,11 +1091,12 @@ D:\TA 2\fe-task-management-copy\src\components\evm\EvmCostWidget.tsx
 
 EVM cost-based memakai:
 
-- `projects.value_amount` sebagai BAC utama.
-- `tasks.budget_cost` untuk PV dan EV per task.
+- Jika baseline dipilih, BAC/PV/EV memakai snapshot `task_baselines.budget_cost_base`.
+- Jika baseline tidak dipilih, BAC memakai `projects.value_amount` jika tersedia, atau total `tasks.budget_cost`.
+- Jika baseline tidak dipilih, PV dan EV memakai `tasks.budget_cost`.
 - `task_cost_entries.amount` untuk AC.
 - `task_progress_entries.percent_complete` untuk EV historis.
-- `task_baselines` untuk jadwal baseline jika baseline dipilih.
+- `task_baselines.start_planned_base` dan `duration_planned_base` untuk jadwal baseline jika baseline dipilih.
 
 ### 11.2 Rumus utama
 
@@ -1115,6 +1133,15 @@ if ($cpi !== null && $cpi > 0.0) {
     $etc = $eac - $totalAC;
 }
 ```
+
+Untuk baseline:
+
+```text
+BAC = sum(task_baselines.budget_cost_base)
+PV/EV = task_baselines.budget_cost_base
+```
+
+Saat baseline baru dibuat, `budget_cost_base` diambil dari budget task saat itu. Nilainya tidak diskalakan lagi ke `projects.value_amount`, sehingga jika total budget task terbaru Rp 1.300.000 maka BAC baseline baru juga Rp 1.300.000.
 
 ### 11.3 Arti angka EVM
 
@@ -1284,6 +1311,8 @@ Baseline menyimpan:
 - end planned base
 - duration planned base
 - planned effort hours
+- budget cost base
+- value amount base
 - weight
 
 Kenapa baseline penting?
@@ -1294,7 +1323,23 @@ Kalau task berubah jadwal, sistem masih bisa membandingkan progress sekarang den
 
 Project create otomatis membuat baseline awal.
 
-Task create juga memastikan task masuk ke baseline terbaru.
+Baseline lama bersifat immutable. Task baru dan update task tidak otomatis mengubah baseline lama. Jika task baru atau perubahan budget/effort/tanggal ingin menjadi rencana baru, user membuat baseline baru.
+
+Aturan baseline yang dipakai sistem:
+
+```text
+Create task setelah baseline dibuat = masuk current plan, tidak masuk baseline lama.
+Update task setelah baseline dibuat = mengubah current plan, tidak mengubah task_baselines lama.
+Create baseline baru = mengambil snapshot task aktif terbaru, termasuk budget dan effort terbaru.
+```
+
+Untuk EVM:
+
+```text
+Baseline lama = hitung dari task_baselines lama.
+Current plan = hitung dari tasks dan task_assignments terbaru.
+Baseline baru = hitung dari snapshot terbaru saat baseline dibuat.
+```
 
 ## 15. Reporting Period dan KPI Snapshot
 
@@ -1403,12 +1448,14 @@ Untuk EVM dan KPI:
 
 ```text
 Task yang berada di bawah milestone archived dikeluarkan dari perhitungan EVM, SPI effort, EVM cost, dan KPI snapshot.
+Task yang di-archive langsung juga dikeluarkan dari perhitungan aktif.
 ```
 
 Penjelasan ke dosen:
 
 ```text
 Archive dianggap sebagai data nonaktif. Karena itu data archived tidak ikut dihitung pada metrik aktif agar total task, progress, EVM, dan KPI sesuai dengan kondisi project yang sedang berjalan.
+Jika archive mengubah scope pekerjaan, user bisa membuat baseline baru agar EVM berikutnya memakai scope terbaru.
 ```
 
 Frontend warning ada di:
@@ -1685,12 +1732,13 @@ Task dependency digunakan untuk mengatur urutan kerja. Sistem mendukung FS, SS, 
 
 ```text
 EVM digunakan untuk mengukur performa project. Sistem menghitung PV, EV, AC, SV, SPI, CV, CPI, EAC, dan ETC. Untuk cost-based EVM, PV dan EV berasal dari budget task, AC berasal dari biaya aktual, dan BAC berasal dari nilai project atau total budget task.
+Jika baseline dipilih, EVM memakai snapshot task_baselines agar perubahan task setelah baseline tidak mengubah rencana lama. Jika ingin rencana baru, user membuat baseline baru.
 ```
 
 ### 20.6 Penjelasan Gantt
 
 ```text
-Gantt Chart menampilkan timeline task dan dependency. Fitur ini bukan sekadar chart, tetapi terhubung langsung dengan data task, milestone, dependency, dan baseline di sistem.
+Gantt Chart menampilkan timeline task dan dependency berdasarkan current plan. Fitur ini bukan sekadar chart, tetapi terhubung langsung dengan data task, milestone, dependency, dan progress terbaru. Baseline tetap dipakai untuk pembanding EVM, sedangkan Gantt dipakai untuk memantau jadwal berjalan.
 ```
 
 ## 21. Peta File Cepat
