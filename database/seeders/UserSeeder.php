@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
+use App\Models\Division;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 
 class UserSeeder extends Seeder
@@ -17,46 +18,48 @@ class UserSeeder extends Seeder
             $this->call(RolePermissionSeeder::class);
         }
 
-        $admin = User::updateOrCreate(
-            ['email' => 'admin@example.com'],
-            [
-                'name' => 'Admin',
-                'password_hash' => 'password',
-                'job_title' => 'Administrator',
-                'is_active' => true,
-                'status' => 'Aktif',
-                'last_login_at' => null,
-            ]
-        );
-        $admin->assignRole('Admin');
-        $admin->removeRole('Member');
+        $this->call(MemberSeeder::class);
 
-        $manager = User::updateOrCreate(
-            ['email' => 'manager@example.com'],
+        $software = Division::updateOrCreate(
+            ['code' => 'SW'],
             [
-                'name' => 'Manager',
-                'password_hash' => 'password',
-                'job_title' => 'Project Manager',
-                'is_active' => true,
+                'name' => 'Software',
+                'description' => 'Tim software untuk frontend, backend, integrasi, QA, DevOps, dan deployment.',
                 'status' => 'Aktif',
-                'last_login_at' => null,
             ]
         );
-        $manager->assignRole('Manager');
-        $manager->removeRole('Member');
 
-        $member = User::updateOrCreate(
-            ['email' => 'member@example.com'],
+        $creative = Division::updateOrCreate(
+            ['code' => 'CR'],
             [
-                'name' => 'Member',
-                'password_hash' => 'password',
-                'job_title' => 'Team Member',
-                'is_active' => true,
+                'name' => 'Creative',
+                'description' => 'Tim creative untuk discovery, UI/UX, konten, visual, dan optimasi digital.',
                 'status' => 'Aktif',
-                'last_login_at' => null,
             ]
         );
-        $member->assignRole('Member');
+
+        $testUsers = [
+            ['name' => 'Admin', 'email' => 'admin@example.com', 'role' => 'Admin', 'division_id' => $software->id],
+            ['name' => 'Manager', 'email' => 'manager@example.com', 'role' => 'Manager', 'division_id' => $software->id],
+            ['name' => 'Member', 'email' => 'member@example.com', 'role' => 'Member', 'division_id' => $creative->id],
+        ];
+
+        foreach ($testUsers as $userData) {
+            $user = User::updateOrCreate(
+                ['email' => $userData['email']],
+                [
+                    'name' => $userData['name'],
+                    'password_hash' => 'password',
+                    'division_id' => $userData['division_id'],
+                    'job_title' => '-',
+                    'is_active' => true,
+                    'status' => 'Aktif',
+                    'last_login_at' => null,
+                ]
+            );
+
+            $user->syncRoles([$userData['role']]);
+        }
     }
 }
  

@@ -210,39 +210,49 @@ class DemoProjectManagementSeeder extends Seeder
 
     private function prepareUsers(): void
     {
-        $division = Division::updateOrCreate(
-            ['code' => 'SW'],
-            [
-                'name' => 'Software',
-                'description' => 'Tim software untuk UI/UX, frontend, backend, integrasi, QA, dan deployment website.',
-                'status' => 'Aktif',
-            ]
-        );
-
-        $mapping = [
-            'gussastra' => ['Gus Sastra', 'gussastra@gmail.com', 'Administrator', 'Admin'],
-            'wira' => ['Wira', 'wira@gmail.com', 'Project Manager', 'Manager'],
-            'gungaria' => ['Gungaria', 'gungaria@gmail.com', 'UI/UX Designer', 'Member'],
-            'gungindra' => ['Gungindra', 'gungindra@gmail.com', 'Content Designer', 'Member'],
-            'krisna' => ['Krisna', 'krisna@gmail.com', 'Frontend Developer', 'Member'],
-            'mahen' => ['Mahen', 'mahen@gmail.com', 'Backend Developer', 'Member'],
-            'dwiki' => ['Dwiki', 'dwiki@gmail.com', 'Integration Developer', 'Member'],
-            'divo' => ['Divo', 'divo@gmail.com', 'QA Engineer', 'Member'],
-            'wisnu' => ['Wisnu', 'wisnu@gmail.com', 'DevOps Engineer', 'Member'],
-            'gustra' => ['Gustra', 'gustra@gmail.com', 'Fullstack Developer', 'Member'],
-            'madeadi' => ['Madeadi', 'madeadi@gmail.com', 'Documentation & Support', 'Member'],
+        $divisions = [
+            'software' => Division::updateOrCreate(
+                ['code' => 'SW'],
+                [
+                    'name' => 'Software',
+                    'description' => 'Tim software untuk frontend, backend, integrasi, QA, DevOps, dan deployment.',
+                    'status' => 'Aktif',
+                ]
+            ),
+            'creative' => Division::updateOrCreate(
+                ['code' => 'CR'],
+                [
+                    'name' => 'Creative',
+                    'description' => 'Tim creative untuk discovery, UI/UX, konten, visual, dan optimasi digital.',
+                    'status' => 'Aktif',
+                ]
+            ),
         ];
 
-        foreach ($mapping as $key => [$name, $email, $jobTitle, $role]) {
-            $this->users[$key] = $this->user($name, $email, $jobTitle, $division->id, $role);
+        $mapping = [
+            'gussastra' => ['Gus Sastra', 'gussastra@gmail.com', 'Member', 'creative'],
+            'wira' => ['Wira', 'wira@gmail.com', 'Admin', 'software'],
+            'gungaria' => ['Gungaria', 'gungaria@gmail.com', 'Member', 'software'],
+            'gungindra' => ['Gungindra', 'gungindra@gmail.com', 'Member', 'creative'],
+            'krisna' => ['Krisna', 'krisna@gmail.com', 'Member', 'creative'],
+            'mahen' => ['Mahen', 'mahen@gmail.com', 'Member', 'software'],
+            'dwiki' => ['Dwiki', 'dwiki@gmail.com', 'Manager', 'creative'],
+            'divo' => ['Divo', 'divo@gmail.com', 'Member', 'software'],
+            'wisnu' => ['Wisnu', 'wisnu@gmail.com', 'Member', 'creative'],
+            'gustra' => ['Gustra', 'gustra@gmail.com', 'Member', 'software'],
+            'madeadi' => ['Madeadi', 'madeadi@gmail.com', 'Manager', 'software'],
+        ];
+
+        foreach ($mapping as $key => [$name, $email, $role, $divisionKey]) {
+            $this->users[$key] = $this->user($name, $email, $divisions[$divisionKey]->id, $role);
         }
 
-        $this->users['admin'] = $this->users['gussastra'];
-        $this->users['manager'] = $this->users['wira'];
+        $this->users['admin'] = $this->users['wira'];
+        $this->users['manager'] = $this->users['dwiki'];
         $this->users['member'] = $this->users['gustra'];
     }
 
-    private function user(string $name, string $email, string $jobTitle, int $divisionId, string $role): User
+    private function user(string $name, string $email, int $divisionId, string $role): User
     {
         $user = User::updateOrCreate(
             ['email' => $email],
@@ -250,7 +260,7 @@ class DemoProjectManagementSeeder extends Seeder
                 'name' => $name,
                 'password_hash' => 'password',
                 'division_id' => $divisionId,
-                'job_title' => $jobTitle,
+                'job_title' => '-',
                 'is_active' => true,
                 'status' => 'Aktif',
             ]
