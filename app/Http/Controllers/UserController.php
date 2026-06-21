@@ -187,6 +187,14 @@ class UserController extends Controller
             ->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
+                'email' => $u->email,
+                'role' => $u->roles->first()->name ?? null,
+                'roles' => $u->roles->pluck('name')->values(),
+                'division' => $u->division ? [
+                    'id' => $u->division->id,
+                    'code' => $u->division->code,
+                    'name' => $u->division->name,
+                ] : null,
             ]);
 
         return response()->json(['data' => $data]);
