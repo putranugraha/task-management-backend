@@ -107,15 +107,27 @@ class CommentController extends Controller
                     'message' => 'Komentar baru ditambahkan pada task '.$task->title,
                 ];
 
+                $task->loadMissing('project.divisionOwner');
+
                 $assignedUsers = TaskAssignment::where('task_id', $task->id)
                     ->with('user')
                     ->get()
                     ->pluck('user')
                     ->filter();
 
-                $admins = User::role('Admin')->get();
+                $projectOwner = $task->project?->divisionOwner;
 
-                $targets = $assignedUsers->merge($admins)->unique('id');
+                $taskManagers = User::query()
+                    ->where('is_active', true)
+                    ->where('status', 'Aktif')
+                    ->get()
+                    ->filter(fn (User $user) => $user->hasPermissionTo('mengubah tugas'));
+
+                $targets = $assignedUsers
+                    ->when($projectOwner, fn ($items) => $items->push($projectOwner))
+                    ->merge($taskManagers)
+                    ->filter()
+                    ->unique('id');
 
                 foreach ($targets as $target) {
                     if ($actor && $target->id === $actor->id) {
