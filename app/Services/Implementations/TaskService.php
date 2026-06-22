@@ -1280,14 +1280,14 @@ class TaskService implements TaskServiceInterface
     }
 
     /**
-     * Kirim notifikasi task update ke assignee dan admin, tanpa mengirim balik ke actor.
+     * Kirim notifikasi task update ke assignee dan pengelola task, tanpa mengirim balik ke actor.
      *
      * @param array<string,mixed> $extraPayload
      */
     protected function notifyTaskWatchers(Task $task, string $eventType, array $extraPayload = []): void
     {
         $actor = Auth::user();
-        $task->loadMissing('assignments.user');
+        $task->loadMissing(['assignments.user', 'project.divisionOwner']);
 
         $recipients = collect();
 
@@ -1298,13 +1298,19 @@ class TaskService implements TaskServiceInterface
             }
         }
 
-        $admins = User::query()
+        $projectOwner = $task->project?->divisionOwner;
+        if ($projectOwner instanceof User) {
+            $recipients->push($projectOwner);
+        }
+
+        $taskManagers = User::query()
+            ->where('is_active', true)
             ->where('status', 'Aktif')
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['Admin', 'Super Admin']))
-            ->get();
+            ->get()
+            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah tugas'));
 
         $recipients = $recipients
-            ->merge($admins)
+            ->merge($taskManagers)
             ->filter(fn ($user) => $user instanceof User)
             ->unique('id')
             ->values();
