@@ -151,7 +151,11 @@ class AttachmentController extends Controller
 
         $projectOwner = $task->project?->divisionOwner;
 
-        $moderators = User::role(['Admin', 'Manager', 'Super Admin'])->get();
+        $moderators = User::query()
+            ->where('is_active', true)
+            ->where('status', 'Aktif')
+            ->get()
+            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah lampiran'));
 
         $targets = $managerAssignments
             ->when($projectOwner, fn ($items) => $items->push($projectOwner))
