@@ -82,12 +82,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Logout current token
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    // Activity logs (for authenticated users, typically viewed by Admin via FE)
-    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
-
     // User notifications
     Route::get('/me/notifications', [NotificationController::class, 'index']);
     Route::post('/me/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+});
+
+Route::middleware(['auth:sanctum', 'active', 'permission:melihat activity log'])->group(function () {
+    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 });
 
 // Lightweight Users options for FE (read-only)
@@ -428,4 +429,3 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus lampiran'])->
     Route::apiResource('attachments', AttachmentController::class)->only(['destroy']);
     Route::delete('attachments/by-entity', [AttachmentController::class, 'destroyByEntity']);
 });
-

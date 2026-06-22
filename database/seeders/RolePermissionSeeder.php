@@ -32,6 +32,7 @@ class RolePermissionSeeder extends Seeder
             'membuat permissions',
             'mengubah permissions',
             'menghapus permissions',
+            'melihat activity log',
             'melihat project',
             'membuat project',
             'mengubah project',

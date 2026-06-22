@@ -144,7 +144,7 @@ class AttachmentController extends Controller
                 $user = $assignment->user;
 
                 return in_array($roleOnTask, ['Manager', 'Project Manager'], true)
-                    || ($user && $user->hasAnyRole(['Manager', 'Admin', 'Super Admin']));
+                    || ($user && $user->hasPermissionTo('mengubah lampiran'));
             })
             ->pluck('user')
             ->filter();
@@ -233,7 +233,7 @@ class AttachmentController extends Controller
             return response()->json(['message' => 'User tidak terautentik'], 401);
         }
 
-        if (!$user->hasAnyRole(['Admin', 'Manager', 'Super Admin'])) {
+        if (!$user->hasPermissionTo('mengubah lampiran')) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk meng-approve attachment'], 403);
         }
 
@@ -298,8 +298,13 @@ class AttachmentController extends Controller
             $targets = $targets->merge($assignedUsers);
         }
 
-        $admins = User::role('Admin')->get();
-        $targets = $targets->merge($admins)->filter()->unique('id');
+        $moderators = User::query()
+            ->where('is_active', true)
+            ->where('status', 'Aktif')
+            ->get()
+            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah lampiran'));
+
+        $targets = $targets->merge($moderators)->filter()->unique('id');
 
         foreach ($targets as $target) {
             if ($target->id === $actor->id) {
@@ -329,7 +334,7 @@ class AttachmentController extends Controller
             return response()->json(['message' => 'User tidak terautentik'], 401);
         }
 
-        if (!$user->hasAnyRole(['Admin', 'Manager', 'Super Admin'])) {
+        if (!$user->hasPermissionTo('mengubah lampiran')) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk meng-reject attachment'], 403);
         }
 
@@ -394,8 +399,13 @@ class AttachmentController extends Controller
             $targets = $targets->merge($assignedUsers);
         }
 
-        $admins = User::role('Admin')->get();
-        $targets = $targets->merge($admins)->filter()->unique('id');
+        $moderators = User::query()
+            ->where('is_active', true)
+            ->where('status', 'Aktif')
+            ->get()
+            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah lampiran'));
+
+        $targets = $targets->merge($moderators)->filter()->unique('id');
 
         foreach ($targets as $target) {
             if ($target->id === $actor->id) {
