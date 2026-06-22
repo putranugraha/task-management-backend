@@ -134,16 +134,30 @@ class AttachmentController extends Controller
             'message' => 'Attachment baru di-upload pada task '.$task->title,
         ];
 
+        $task->loadMissing('project.divisionOwner');
+
         $managerAssignments = TaskAssignment::where('task_id', $task->id)
-            ->where('role_on_task', 'Manager')
             ->with('user')
             ->get()
+            ->filter(function (TaskAssignment $assignment) {
+                $roleOnTask = (string) ($assignment->role_on_task ?? '');
+                $user = $assignment->user;
+
+                return in_array($roleOnTask, ['Manager', 'Project Manager'], true)
+                    || ($user && $user->hasAnyRole(['Manager', 'Admin', 'Super Admin']));
+            })
             ->pluck('user')
             ->filter();
 
-        $admins = User::role('Admin')->get();
+        $projectOwner = $task->project?->divisionOwner;
 
-        $targets = $managerAssignments->merge($admins)->unique('id');
+        $moderators = User::role(['Admin', 'Manager', 'Super Admin'])->get();
+
+        $targets = $managerAssignments
+            ->when($projectOwner, fn ($items) => $items->push($projectOwner))
+            ->merge($moderators)
+            ->filter()
+            ->unique('id');
 
         foreach ($targets as $target) {
             if ($actor && $target->id === $actor->id) {
