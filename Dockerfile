@@ -46,6 +46,7 @@ FROM nginx:1.27-alpine AS nginx
 WORKDIR /var/www/html
 
 COPY --from=app /var/www/html/public ./public
+RUN ln -s /var/www/html/storage/app/public /var/www/html/public/storage
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
