@@ -108,6 +108,30 @@ class TimeEntryController extends Controller
      * Create a time entry for a specific Task for the authenticated user.
      * Route: POST /tasks/{task}/time-entries
      */
+    public function startForTask(Task $task, Request $request)
+    {
+        $userId = $request->user()?->id;
+        if (!$userId) {
+            return response()->json(['message' => 'User tidak terautentik'], 401);
+        }
+
+        $date = Carbon::today()->toDateString();
+        $this->service->startTaskForTimeEntry((int) $task->id, $date);
+
+        $task->refresh();
+
+        return response()->json([
+            'message' => 'Task siap dicatat waktunya.',
+            'task_id' => $task->id,
+            'status' => $task->status,
+            'start_actual' => optional($task->start_actual)->format('Y-m-d'),
+        ]);
+    }
+
+    /**
+     * Create a time entry for a specific Task for the authenticated user.
+     * Route: POST /tasks/{task}/time-entries
+     */
     public function storeForTask(Task $task, TaskTimeEntryStoreRequest $request)
     {
         $userId = $request->user()?->id;

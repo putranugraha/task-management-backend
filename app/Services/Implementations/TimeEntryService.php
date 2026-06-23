@@ -254,6 +254,11 @@ class TimeEntryService implements TimeEntryServiceInterface
         return $this->repository->getTopTasksByHoursAsOf($projectId, $asOfDate, $limit);
     }
 
+    public function startTaskForTimeEntry(int $taskId, string $entryDate): void
+    {
+        $this->prepareTaskForTimeEntry($taskId, $entryDate);
+    }
+
     protected function clearCaches($id = null, $taskId = null, $userId = null): void
     {
         Cache::forget(self::CACHE_ALL);

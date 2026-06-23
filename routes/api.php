@@ -377,6 +377,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:menghapus tugas'])->gro
 
 // Log time entries for own tasks (simplified via nested routes)
 Route::middleware(['auth:sanctum', 'active', 'permission:mengisi entri waktu'])->group(function () {
+    Route::post('tasks/{task}/time-entries/start', [TimeEntryController::class, 'startForTask']);
     Route::post('tasks/{task}/time-entries', [TimeEntryController::class, 'storeForTask']);
     Route::post('tasks/{task}/time-entries/upsert', [TimeEntryController::class, 'storeOrUpdateForTask']);
 });

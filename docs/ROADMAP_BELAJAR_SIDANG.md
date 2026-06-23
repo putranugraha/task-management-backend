@@ -740,7 +740,11 @@ Urutan demo yang disarankan:
 10. Tunjukkan KPI/report.
 11. Tunjukkan notification.
 12. Tunjukkan archive dan restore.
-13. Jelaskan hard delete hanya untuk project archived.
+13. Jelaskan hard del
+
+
+
+ete hanya untuk project archived.
 
 ## 19. Pertanyaan Dosen yang Mungkin Muncul
 

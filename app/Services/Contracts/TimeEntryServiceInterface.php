@@ -18,6 +18,7 @@ interface TimeEntryServiceInterface
     public function getTotalHoursByProjectAsOf(int $projectId, string $asOfDate);
     public function getTopTasksByHoursAsOf(int $projectId, string $asOfDate, int $limit = 5);
     public function createOrUpdate(array $data);
+    public function startTaskForTimeEntry(int $taskId, string $entryDate): void;
 
     /**
      * Ambil time entry dengan pagination dan filter sederhana.
