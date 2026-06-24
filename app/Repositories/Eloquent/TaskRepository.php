@@ -221,6 +221,7 @@ class TaskRepository implements TaskRepositoryInterface
 
         return $query
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate($perPage);
     }
 
