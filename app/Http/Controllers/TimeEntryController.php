@@ -159,26 +159,45 @@ class TimeEntryController extends Controller
      * Upsert time entry by (task_id, user_id, date).
      * Simplifies FE flow: repeat POST to update hours on the same day.
      */
-    public function storeOrUpdate(TimeEntryStoreRequest $request)
-    {
-        $data = $request->validated();
-        $before = TimeEntry::where('task_id', $data['task_id'])
-            ->where('user_id', $data['user_id'])
-            ->where('date', $data['date'])
-            ->first();
+public function storeOrUpdate(TimeEntryStoreRequest $request)
+{
+    $data = $request->validated();
 
-        $row = $this->service->createOrUpdate($data);
+    $userId = $request->user()?->id;
 
-        $actorId = $request->user()?->id;
-        $date = (string) ($row->date ?? $data['date']);
-        $beforeHours = $before?->hours ?? null;
-        $afterHours = $row->hours ?? null;
-        $note = $before
-            ? ('Time entry diperbarui: '.$date.' ('.$beforeHours.' -> '.$afterHours.' jam)')
-            : ('Time entry ditambahkan: '.$date.' ('.$afterHours.' jam)');
-        TaskHistoryLogger::logByTaskId((int) ($row->task_id ?? $data['task_id']), $actorId, $note);
-        return new TimeEntryResource($row);
+    if (!$userId) {
+        return response()->json([
+            'message' => 'User tidak terautentik'
+        ], 401);
     }
+
+    // Jangan percaya user_id dari frontend.
+    $data['user_id'] = (int) $userId;
+
+    $before = TimeEntry::where('task_id', $data['task_id'])
+        ->where('user_id', $data['user_id'])
+        ->where('date', $data['date'])
+        ->first();
+
+    $row = $this->service->createOrUpdate($data);
+
+    $actorId = $request->user()?->id;
+    $date = (string) ($row->date ?? $data['date']);
+    $beforeHours = $before?->hours ?? null;
+    $afterHours = $row->hours ?? null;
+
+    $note = $before
+        ? ('Time entry diperbarui: '.$date.' ('.$beforeHours.' -> '.$afterHours.' jam)')
+        : ('Time entry ditambahkan: '.$date.' ('.$afterHours.' jam)');
+
+    TaskHistoryLogger::logByTaskId(
+        (int) ($row->task_id ?? $data['task_id']),
+        $actorId,
+        $note
+    );
+
+    return new TimeEntryResource($row);
+}
 
     /**
      * Upsert time entry by (task_id, user_id, date) for a specific Task.

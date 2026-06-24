@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\TimeEntry;
 use App\Models\Task;
 use Illuminate\Support\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 
 class TimeEntryService implements TimeEntryServiceInterface
 {
@@ -70,7 +72,16 @@ class TimeEntryService implements TimeEntryServiceInterface
 
     public function createTimeEntry(array $data)
     {
-        $data = $this->appendProgressToNote($data);
+         $taskId = (int) ($data['task_id'] ?? 0);
+
+    $data['user_id'] = $this->authorizeTaskTimeEntry(
+        $taskId,
+        isset($data['user_id']) ? (int) $data['user_id'] : null
+    );
+
+    $data = $this->appendProgressToNote($data);
+
+        
         if (isset($data['task_id'], $data['date'])) {
             $this->prepareTaskForTimeEntry((int) $data['task_id'], (string) $data['date']);
         }
@@ -110,11 +121,19 @@ class TimeEntryService implements TimeEntryServiceInterface
     public function createOrUpdate(array $data)
     {
         // Normalise payload
-        $taskId = $data['task_id'];
-        $userId = $data['user_id'];
+        $taskId = (int) $data['task_id'];
+
+        $userId = $this->authorizeTaskTimeEntry(
+            $taskId,
+            isset($data['user_id']) ? (int) $data['user_id'] : null
+        );
+
+        $data['user_id'] = $userId;
+
         $date = $data['date'];
         $hours = $data['hours'];
-        $note = ($this->appendProgressToNote($data)['note'] ?? ($data['note'] ?? null));
+        $note = ($this->appendProgressToNote($data)['note']
+            ?? ($data['note'] ?? null));
 
         $this->prepareTaskForTimeEntry((int) $taskId, (string) $date);
 
@@ -254,8 +273,12 @@ class TimeEntryService implements TimeEntryServiceInterface
         return $this->repository->getTopTasksByHoursAsOf($projectId, $asOfDate, $limit);
     }
 
-    public function startTaskForTimeEntry(int $taskId, string $entryDate): void
-    {
+    public function startTaskForTimeEntry(
+        int $taskId,
+        string $entryDate
+    ): void {
+        $this->authorizeTaskTimeEntry($taskId);
+
         $this->prepareTaskForTimeEntry($taskId, $entryDate);
     }
 
@@ -303,6 +326,43 @@ class TimeEntryService implements TimeEntryServiceInterface
 
         $data['note'] = $note;
         return $data;
+    }
+
+    protected function authorizeTaskTimeEntry(
+    int $taskId,
+    ?int $requestedUserId = null): int {
+        $actor = Auth::user();
+
+        if (!$actor) {
+            throw new AuthorizationException('User tidak terautentik.');
+        }
+
+        $actorId = (int) $actor->id;
+
+        if (!$actor->can('mengisi entri waktu')) {
+            throw new AuthorizationException(
+                'Kamu tidak memiliki izin untuk mengisi entri waktu.'
+            );
+        }
+
+        if ($requestedUserId !== null && $requestedUserId !== $actorId) {
+            throw new AuthorizationException(
+                'Kamu hanya dapat mencatat waktu untuk akunmu sendiri.'
+            );
+        }
+
+        $isAssigned = DB::table('task_assignments')
+            ->where('task_id', $taskId)
+            ->where('user_id', $actorId)
+            ->exists();
+
+        if (!$isAssigned) {
+            throw new AuthorizationException(
+                'Kamu bukan assignee pada task ini, sehingga tidak dapat mencatat waktu.'
+            );
+        }
+
+        return $actorId;
     }
 
     protected function prepareTaskForTimeEntry(int $taskId, string $entryDate): void
