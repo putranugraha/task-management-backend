@@ -30,9 +30,15 @@ class NotificationController extends Controller
         }
 
         $notifications = $query->paginate($perPage);
+        $targetStatuses = $this->resolveNotificationTargetStatuses($notifications->getCollection());
 
-        $data = $notifications->map(function (DatabaseNotification $notification) {
+        $data = $notifications->map(function (DatabaseNotification $notification) use ($targetStatuses) {
             $payload = $notification->data ?? [];
+            $targetStatus = $targetStatuses[$notification->id] ?? [
+                'target_type' => null,
+                'target_id' => null,
+                'target_archived' => false,
+            ];
 
             return [
                 'id' => $notification->id,
@@ -53,6 +59,9 @@ class NotificationController extends Controller
                 'percent_before' => $payload['percent_before'] ?? null,
                 'percent_after' => $payload['percent_after'] ?? null,
                 'due_date' => $payload['due_date'] ?? null,
+                'target_type' => $targetStatus['target_type'],
+                'target_id' => $targetStatus['target_id'],
+                'target_archived' => $targetStatus['target_archived'],
                 'read_at' => optional($notification->read_at)?->toIso8601String(),
                 'created_at' => optional($notification->created_at)?->toIso8601String(),
             ];
@@ -171,5 +180,91 @@ class NotificationController extends Controller
                 $notification->delete();
             }
         }
+    }
+
+    private function resolveNotificationTargetStatuses($notifications): array
+    {
+        $taskIds = [];
+        $projectIds = [];
+        $milestoneIds = [];
+
+        foreach ($notifications as $notification) {
+            $payload = $notification->data ?? [];
+            $target = $this->notificationTargetFromPayload($payload);
+
+            if ($target['type'] === 'Task') {
+                $taskIds[] = $target['id'];
+            } elseif ($target['type'] === 'Project') {
+                $projectIds[] = $target['id'];
+            } elseif ($target['type'] === 'Milestone') {
+                $milestoneIds[] = $target['id'];
+            }
+        }
+
+        $tasks = Task::withTrashed()
+            ->whereIn('id', array_values(array_unique($taskIds)))
+            ->get(['id', 'deleted_at'])
+            ->keyBy('id');
+
+        $projects = Project::withTrashed()
+            ->whereIn('id', array_values(array_unique($projectIds)))
+            ->get(['id', 'deleted_at'])
+            ->keyBy('id');
+
+        $milestones = Milestone::withTrashed()
+            ->whereIn('id', array_values(array_unique($milestoneIds)))
+            ->get(['id', 'deleted_at'])
+            ->keyBy('id');
+
+        $statuses = [];
+        foreach ($notifications as $notification) {
+            $payload = $notification->data ?? [];
+            $target = $this->notificationTargetFromPayload($payload);
+            $model = null;
+
+            if ($target['type'] === 'Task') {
+                $model = $tasks->get($target['id']);
+            } elseif ($target['type'] === 'Project') {
+                $model = $projects->get($target['id']);
+            } elseif ($target['type'] === 'Milestone') {
+                $model = $milestones->get($target['id']);
+            }
+
+            $statuses[$notification->id] = [
+                'target_type' => $target['type'],
+                'target_id' => $target['id'],
+                'target_archived' => (bool) ($model?->deleted_at),
+            ];
+        }
+
+        return $statuses;
+    }
+
+    private function notificationTargetFromPayload(array $payload): array
+    {
+        if (!empty($payload['task_id'])) {
+            return ['type' => 'Task', 'id' => (int) $payload['task_id']];
+        }
+
+        $entityType = class_basename((string) ($payload['entity_type'] ?? ''));
+        $entityId = (int) ($payload['entity_id'] ?? 0);
+
+        if ($entityType === 'Task' && $entityId > 0) {
+            return ['type' => 'Task', 'id' => $entityId];
+        }
+
+        if (!empty($payload['project_id'])) {
+            return ['type' => 'Project', 'id' => (int) $payload['project_id']];
+        }
+
+        if ($entityType === 'Project' && $entityId > 0) {
+            return ['type' => 'Project', 'id' => $entityId];
+        }
+
+        if ($entityType === 'Milestone' && $entityId > 0) {
+            return ['type' => 'Milestone', 'id' => $entityId];
+        }
+
+        return ['type' => null, 'id' => null];
     }
 }
