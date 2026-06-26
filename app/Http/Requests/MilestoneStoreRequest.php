@@ -16,7 +16,7 @@ class MilestoneStoreRequest extends FormRequest
         return [
             'project_id' => 'required|exists:projects,id',
             'name' => 'required|string|max:150',
-            'due_planned' => 'nullable|date',
+            'due_planned' => 'required|date',
             'status' => 'required|in:Planned,In Progress,Completed,Overdue,On Hold',
         ];
     }
