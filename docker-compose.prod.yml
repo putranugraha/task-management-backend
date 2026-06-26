@@ -16,6 +16,24 @@ services:
       backend-db:
         condition: service_healthy
 
+  backend-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: backend-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - backend-storage:/var/www/html/storage
+    networks:
+      - backend-network
+    depends_on:
+      backend-db:
+        condition: service_healthy
+    command: php artisan schedule:work
+
   backend-nginx:
     build:
       context: .

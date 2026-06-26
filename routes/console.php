@@ -10,4 +10,5 @@ Artisan::command('inspire', function () {
 
 Schedule::command('notifications:task-deadlines --days=3')
     ->dailyAt('08:00')
+    ->timezone('Asia/Makassar')
     ->withoutOverlapping();
