@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Notifications\DatabaseNotification;
 
 class ProjectRepository implements ProjectRepositoryInterface
 {
@@ -214,6 +215,12 @@ class ProjectRepository implements ProjectRepositoryInterface
                     $this->deletePolymorphicRows(Attachment::class, Task::class, $taskIds->all());
                 }
 
+                $this->deleteProjectRelatedNotifications(
+                    (int) $project->id,
+                    $taskIds->all(),
+                    $milestoneIds->all()
+                );
+
                 $project->forceDelete();
 
                 return $attachmentPaths;
@@ -240,6 +247,45 @@ class ProjectRepository implements ProjectRepositoryInterface
             ->whereIn('entity_type', [$entityClass, class_basename($entityClass)])
             ->whereIn('entity_id', $entityIds)
             ->delete();
+    }
+
+    private function deleteProjectRelatedNotifications(int $projectId, array $taskIds, array $milestoneIds): void
+    {
+        $taskIdSet = array_fill_keys(array_map('intval', $taskIds), true);
+        $milestoneIdSet = array_fill_keys(array_map('intval', $milestoneIds), true);
+
+        DatabaseNotification::query()
+            ->get()
+            ->each(function (DatabaseNotification $notification) use ($projectId, $taskIdSet, $milestoneIdSet) {
+                $payload = $notification->data ?? [];
+
+                if ((int) ($payload['project_id'] ?? 0) === $projectId) {
+                    $notification->delete();
+                    return;
+                }
+
+                if (isset($taskIdSet[(int) ($payload['task_id'] ?? 0)])) {
+                    $notification->delete();
+                    return;
+                }
+
+                $entityType = class_basename((string) ($payload['entity_type'] ?? ''));
+                $entityId = (int) ($payload['entity_id'] ?? 0);
+
+                if ($entityType === 'Project' && $entityId === $projectId) {
+                    $notification->delete();
+                    return;
+                }
+
+                if ($entityType === 'Task' && isset($taskIdSet[$entityId])) {
+                    $notification->delete();
+                    return;
+                }
+
+                if ($entityType === 'Milestone' && isset($milestoneIdSet[$entityId])) {
+                    $notification->delete();
+                }
+            });
     }
 
     public function updateProjectStatus($id, $status)

@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Milestone;
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -10,6 +14,7 @@ class NotificationController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $this->pruneStaleNotifications($user);
 
         $onlyUnread = filter_var($request->query('only_unread', false), FILTER_VALIDATE_BOOLEAN);
 
@@ -80,5 +85,91 @@ class NotificationController extends Controller
         }
 
         return response()->json(['message' => 'Notifikasi ditandai sebagai dibaca']);
+    }
+
+    private function pruneStaleNotifications(User $user): void
+    {
+        $notifications = $user->notifications()->get();
+        if ($notifications->isEmpty()) {
+            return;
+        }
+
+        $taskIds = [];
+        $projectIds = [];
+        $milestoneIds = [];
+
+        foreach ($notifications as $notification) {
+            $payload = $notification->data ?? [];
+
+            if (!empty($payload['task_id'])) {
+                $taskIds[] = (int) $payload['task_id'];
+            }
+
+            if (!empty($payload['project_id'])) {
+                $projectIds[] = (int) $payload['project_id'];
+            }
+
+            $entityType = class_basename((string) ($payload['entity_type'] ?? ''));
+            $entityId = (int) ($payload['entity_id'] ?? 0);
+
+            if ($entityType === 'Task' && $entityId > 0) {
+                $taskIds[] = $entityId;
+            } elseif ($entityType === 'Project' && $entityId > 0) {
+                $projectIds[] = $entityId;
+            } elseif ($entityType === 'Milestone' && $entityId > 0) {
+                $milestoneIds[] = $entityId;
+            }
+        }
+
+        $existingTaskIds = Task::withTrashed()
+            ->whereIn('id', array_values(array_unique($taskIds)))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+
+        $existingProjectIds = Project::withTrashed()
+            ->whereIn('id', array_values(array_unique($projectIds)))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+
+        $existingMilestoneIds = Milestone::withTrashed()
+            ->whereIn('id', array_values(array_unique($milestoneIds)))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+
+        foreach ($notifications as $notification) {
+            $payload = $notification->data ?? [];
+
+            $taskId = (int) ($payload['task_id'] ?? 0);
+            if ($taskId > 0 && !$existingTaskIds->has($taskId)) {
+                $notification->delete();
+                continue;
+            }
+
+            $projectId = (int) ($payload['project_id'] ?? 0);
+            if ($projectId > 0 && !$existingProjectIds->has($projectId)) {
+                $notification->delete();
+                continue;
+            }
+
+            $entityType = class_basename((string) ($payload['entity_type'] ?? ''));
+            $entityId = (int) ($payload['entity_id'] ?? 0);
+
+            if ($entityType === 'Task' && $entityId > 0 && !$existingTaskIds->has($entityId)) {
+                $notification->delete();
+                continue;
+            }
+
+            if ($entityType === 'Project' && $entityId > 0 && !$existingProjectIds->has($entityId)) {
+                $notification->delete();
+                continue;
+            }
+
+            if ($entityType === 'Milestone' && $entityId > 0 && !$existingMilestoneIds->has($entityId)) {
+                $notification->delete();
+            }
+        }
     }
 }
