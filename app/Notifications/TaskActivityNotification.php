@@ -24,6 +24,10 @@ class TaskActivityNotification extends Notification
     {
         $channels = ['database'];
 
+        if (($this->payload['database_only'] ?? false) === true) {
+            return $channels;
+        }
+
         if (
             filter_var(config('notifications.mail_enabled', false), FILTER_VALIDATE_BOOLEAN)
             && !empty($notifiable->email)

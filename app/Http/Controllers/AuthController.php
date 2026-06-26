@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
+use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskActivityNotification;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -58,6 +60,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token', ['*'], Carbon::now()->addDay())->plainTextToken;
         $this->recordAuthActivity($user, 'login', $request);
+        $this->sendLoginDeadlineNotifications($user);
 
         return response()->json([
             'user' => [
@@ -200,5 +203,90 @@ class AuthController extends Controller
         } catch (\Throwable $e) {
             Log::warning("Failed to record auth activity {$event}: {$e->getMessage()}");
         }
+    }
+
+    private function sendLoginDeadlineNotifications(User $user): void
+    {
+        try {
+            $today = Carbon::today()->startOfDay();
+            $until = $today->copy()->addDays(3);
+
+            $tasks = Task::query()
+                ->with('project')
+                ->whereNotNull('end_planned')
+                ->whereNotIn('status', ['Done', 'Cancelled'])
+                ->whereHas('project')
+                ->where(function ($query) {
+                    $query->whereNull('milestone_id')
+                        ->orWhereHas('milestone');
+                })
+                ->whereDate('end_planned', '<=', $until->toDateString())
+                ->where(function ($query) use ($user) {
+                    $query->whereHas('assignments', function ($assignmentQuery) use ($user) {
+                        $assignmentQuery->where('user_id', $user->id);
+                    })->orWhereHas('project', function ($projectQuery) use ($user) {
+                        $projectQuery->where('division_owner_id', $user->id);
+                    });
+                })
+                ->orderBy('end_planned')
+                ->limit(50)
+                ->get();
+
+            $recentNotifications = $user->notifications()
+                ->where('type', TaskActivityNotification::class)
+                ->where('created_at', '>=', now()->subDays(45))
+                ->get();
+
+            foreach ($tasks as $task) {
+                $dueDate = Carbon::parse($task->end_planned)->startOfDay();
+                $eventType = $dueDate->lt($today) ? 'task_overdue' : 'task_due_soon';
+                $dueDateString = $dueDate->toDateString();
+
+                if ($this->deadlineNotificationAlreadySent($recentNotifications, $eventType, (int) $task->id, $dueDateString)) {
+                    continue;
+                }
+
+                $user->notify(new TaskActivityNotification($eventType, [
+                    'database_only' => true,
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'entity_type' => 'Task',
+                    'entity_id' => $task->id,
+                    'project_id' => $task->project_id,
+                    'project_name' => $task->project?->name,
+                    'due_date' => $dueDateString,
+                    'message' => $this->deadlineMessageFor($eventType, $task->title, $dueDate, $today),
+                ]));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to send login deadline notifications for user {$user->id}: {$e->getMessage()}");
+        }
+    }
+
+    private function deadlineNotificationAlreadySent($notifications, string $eventType, int $taskId, string $dueDate): bool
+    {
+        return $notifications->contains(function ($notification) use ($eventType, $taskId, $dueDate) {
+            $data = $notification->data ?? [];
+
+            return ($data['event'] ?? null) === $eventType
+                && (int) ($data['task_id'] ?? 0) === $taskId
+                && ($data['due_date'] ?? null) === $dueDate;
+        });
+    }
+
+    private function deadlineMessageFor(string $eventType, string $title, Carbon $dueDate, Carbon $today): string
+    {
+        if ($eventType === 'task_overdue') {
+            $daysLate = $dueDate->diffInDays($today);
+
+            return 'Task '.$title.' sudah melewati deadline '.$dueDate->toDateString().' selama '.$daysLate.' hari.';
+        }
+
+        $daysLeft = $today->diffInDays($dueDate);
+        if ($daysLeft === 0) {
+            return 'Task '.$title.' jatuh tempo hari ini.';
+        }
+
+        return 'Task '.$title.' akan jatuh tempo pada '.$dueDate->toDateString().' ('.$daysLeft.' hari lagi).';
     }
 }
