@@ -202,8 +202,12 @@ class NotificationController extends Controller
         }
 
         $tasks = Task::withTrashed()
+            ->with([
+                'project' => fn ($query) => $query->withTrashed()->select('id', 'deleted_at'),
+                'milestone' => fn ($query) => $query->withTrashed()->select('id', 'project_id', 'deleted_at'),
+            ])
             ->whereIn('id', array_values(array_unique($taskIds)))
-            ->get(['id', 'deleted_at'])
+            ->get(['id', 'project_id', 'milestone_id', 'deleted_at'])
             ->keyBy('id');
 
         $projects = Project::withTrashed()
@@ -212,8 +216,9 @@ class NotificationController extends Controller
             ->keyBy('id');
 
         $milestones = Milestone::withTrashed()
+            ->with(['project' => fn ($query) => $query->withTrashed()->select('id', 'deleted_at')])
             ->whereIn('id', array_values(array_unique($milestoneIds)))
-            ->get(['id', 'deleted_at'])
+            ->get(['id', 'project_id', 'deleted_at'])
             ->keyBy('id');
 
         $statuses = [];
@@ -233,11 +238,33 @@ class NotificationController extends Controller
             $statuses[$notification->id] = [
                 'target_type' => $target['type'],
                 'target_id' => $target['id'],
-                'target_archived' => (bool) ($model?->deleted_at),
+                'target_archived' => $this->isNotificationTargetArchived($target['type'], $model),
             ];
         }
 
         return $statuses;
+    }
+
+    private function isNotificationTargetArchived(?string $targetType, $model): bool
+    {
+        if (!$model) {
+            return false;
+        }
+
+        if ((bool) ($model->deleted_at ?? null)) {
+            return true;
+        }
+
+        if ($targetType === 'Task') {
+            return (bool) ($model->project?->deleted_at ?? null)
+                || (bool) ($model->milestone?->deleted_at ?? null);
+        }
+
+        if ($targetType === 'Milestone') {
+            return (bool) ($model->project?->deleted_at ?? null);
+        }
+
+        return false;
     }
 
     private function notificationTargetFromPayload(array $payload): array

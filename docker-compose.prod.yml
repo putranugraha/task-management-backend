@@ -34,6 +34,24 @@ services:
         condition: service_healthy
     command: php artisan schedule:work
 
+  backend-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: backend-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - backend-storage:/var/www/html/storage
+    networks:
+      - backend-network
+    depends_on:
+      backend-db:
+        condition: service_healthy
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=60
+
   backend-nginx:
     build:
       context: .

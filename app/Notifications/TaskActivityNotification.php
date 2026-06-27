@@ -3,13 +3,18 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
-class TaskActivityNotification extends Notification
+class TaskActivityNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 3;
+
+    public int $timeout = 60;
 
     protected string $eventType;
     protected array $payload;
@@ -97,7 +102,7 @@ class TaskActivityNotification extends Notification
     private function mailSubject(string $taskTitle): string
     {
         return match ($this->eventType) {
-            'task_a+ssigned' => 'Task baru ditugaskan: '.$taskTitle,
+            'task_assigned' => 'Task baru ditugaskan: '.$taskTitle,
             'comment_added' => 'Komentar baru pada task: '.$taskTitle,
             'attachment_uploaded' => 'Lampiran baru pada task: '.$taskTitle,
             'attachment_approved' => 'Lampiran disetujui: '.$taskTitle,
