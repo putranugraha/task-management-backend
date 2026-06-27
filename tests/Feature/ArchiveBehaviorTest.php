@@ -238,6 +238,69 @@ class ArchiveBehaviorTest extends TestCase
         $this->assertSame(200000.0, $cost['bac']);
     }
 
+    public function test_baseline_evm_keeps_archived_tasks_captured_in_the_snapshot(): void
+    {
+        $project = Project::factory()->create(['value_amount' => 1_000_000]);
+        $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'start_planned' => '2026-06-13',
+            'end_planned' => '2026-06-14',
+            'duration_planned' => 2,
+            'percent_complete' => 50,
+            'budget_cost' => 200_000,
+            'created_at' => '2026-06-13 07:00:00',
+        ]);
+
+        TaskAssignment::factory()->create([
+            'task_id' => $task->id,
+            'estimated_effort_hours' => 16,
+        ]);
+
+        $baseline = ProjectBaseline::create([
+            'project_id' => $project->id,
+            'baseline_name' => 'Baseline Sebelum Task Diarsipkan',
+            'taken_at' => '2026-06-13 08:00:00',
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-19',
+            'value_amount_base' => 200_000,
+        ]);
+
+        TaskBaseline::create([
+            'baseline_id' => $baseline->id,
+            'task_id' => $task->id,
+            'start_planned_base' => '2026-06-13',
+            'end_planned_base' => '2026-06-14',
+            'duration_planned_base' => 2,
+            'planned_effort_hours' => 16,
+            'budget_cost_base' => 200_000,
+        ]);
+
+        $effortBeforeArchive = app(EvmServiceInterface::class)
+            ->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+        $costBeforeArchive = app(EvmCostServiceInterface::class)
+            ->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+
+        $task->delete();
+
+        $effortAfterArchive = app(EvmServiceInterface::class)
+            ->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+        $costAfterArchive = app(EvmCostServiceInterface::class)
+            ->computeForProjectDate($project->id, '2026-06-16', $baseline->id);
+
+        $this->assertSame(1, $effortAfterArchive['meta']['task_count']);
+        $this->assertSame(1, $costAfterArchive['meta']['task_count']);
+        $this->assertSame($effortBeforeArchive['pv'], $effortAfterArchive['pv']);
+        $this->assertSame($effortBeforeArchive['ev'], $effortAfterArchive['ev']);
+        $this->assertSame($effortBeforeArchive['ac'], $effortAfterArchive['ac']);
+        $this->assertSame($costBeforeArchive['pv'], $costAfterArchive['pv']);
+        $this->assertSame($costBeforeArchive['ev'], $costAfterArchive['ev']);
+        $this->assertSame($costBeforeArchive['ac'], $costAfterArchive['ac']);
+        $this->assertSame(200000.0, $costAfterArchive['bac']);
+    }
+
     public function test_creating_task_does_not_mutate_existing_project_baseline(): void
     {
         $project = Project::factory()->create(['value_amount' => 1_000_000]);

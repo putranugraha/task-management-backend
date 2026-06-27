@@ -49,7 +49,7 @@ class EvmService implements EvmServiceInterface
 
         // Fetch tasks for project (minimal columns).
         // When a baseline is selected, only tasks captured in that baseline are part of the baseline calculation.
-        $tasksQuery = Task::query()
+        $tasksQuery = ($baselineId ? Task::withTrashed() : Task::query())
             ->where('project_id', $projectId)
             ->where(function ($query) {
                 $query->whereNull('milestone_id')
