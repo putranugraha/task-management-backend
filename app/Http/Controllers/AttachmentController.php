@@ -136,39 +136,13 @@ class AttachmentController extends Controller
 
         $task->loadMissing('project.divisionOwner');
 
-        $managerAssignments = TaskAssignment::where('task_id', $task->id)
-            ->with('user')
-            ->get()
-            ->filter(function (TaskAssignment $assignment) {
-                $roleOnTask = (string) ($assignment->role_on_task ?? '');
-                $user = $assignment->user;
-
-                return in_array($roleOnTask, ['Manager', 'Project Manager'], true)
-                    || ($user && $user->hasPermissionTo('mengubah lampiran'));
-            })
-            ->pluck('user')
-            ->filter();
-
         $projectOwner = $task->project?->divisionOwner;
-
-        $moderators = User::query()
-            ->where('is_active', true)
-            ->where('status', 'Aktif')
-            ->get()
-            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah lampiran'));
-
-        $targets = $managerAssignments
-            ->when($projectOwner, fn ($items) => $items->push($projectOwner))
-            ->merge($moderators)
-            ->filter()
-            ->unique('id');
-
-        foreach ($targets as $target) {
-            if ($actor && $target->id === $actor->id) {
-                continue;
-            }
-
-            $target->notify(new TaskActivityNotification('attachment_uploaded', $payload));
+        if (
+            $projectOwner instanceof User
+            && $projectOwner->hasPermissionTo('mengubah lampiran')
+            && (!$actor || (int) $projectOwner->id !== (int) $actor->id)
+        ) {
+            $projectOwner->notify(new TaskActivityNotification('attachment_uploaded', $payload));
         }
 
         return new AttachmentResource($row);
@@ -298,13 +272,7 @@ class AttachmentController extends Controller
             $targets = $targets->merge($assignedUsers);
         }
 
-        $moderators = User::query()
-            ->where('is_active', true)
-            ->where('status', 'Aktif')
-            ->get()
-            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah lampiran'));
-
-        $targets = $targets->merge($moderators)->filter()->unique('id');
+        $targets = $targets->filter()->unique('id');
 
         foreach ($targets as $target) {
             if ($target->id === $actor->id) {
@@ -389,23 +357,7 @@ class AttachmentController extends Controller
             }
         }
 
-        if ($task) {
-            $assignedUsers = TaskAssignment::where('task_id', $task->id)
-                ->with('user')
-                ->get()
-                ->pluck('user')
-                ->filter();
-
-            $targets = $targets->merge($assignedUsers);
-        }
-
-        $moderators = User::query()
-            ->where('is_active', true)
-            ->where('status', 'Aktif')
-            ->get()
-            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah lampiran'));
-
-        $targets = $targets->merge($moderators)->filter()->unique('id');
+        $targets = $targets->filter()->unique('id');
 
         foreach ($targets as $target) {
             if ($target->id === $actor->id) {

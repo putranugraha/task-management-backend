@@ -1299,18 +1299,14 @@ class TaskService implements TaskServiceInterface
         }
 
         $projectOwner = $task->project?->divisionOwner;
-        if ($projectOwner instanceof User) {
+        if (
+            $projectOwner instanceof User
+            && $projectOwner->hasPermissionTo('mengubah tugas')
+        ) {
             $recipients->push($projectOwner);
         }
 
-        $taskManagers = User::query()
-            ->where('is_active', true)
-            ->where('status', 'Aktif')
-            ->get()
-            ->filter(fn (User $user) => $user->hasPermissionTo('mengubah tugas'));
-
         $recipients = $recipients
-            ->merge($taskManagers)
             ->filter(fn ($user) => $user instanceof User)
             ->unique('id')
             ->values();
