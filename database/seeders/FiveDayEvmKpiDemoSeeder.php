@@ -18,6 +18,7 @@ use App\Models\TaskDependency;
 use App\Models\TaskProgressEntry;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Services\Contracts\KpiSnapshotServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Notifications\DatabaseNotification;
@@ -112,7 +113,9 @@ class FiveDayEvmKpiDemoSeeder extends Seeder
                     ProjectBaseline::whereIn('id', $baselineIds)->delete();
                 }
 
-                Comment::where('entity_type', Project::class)->where('entity_id', $project->id)->delete();
+                Comment::whereIn('entity_type', [Project::class, $project->getMorphClass()])
+                    ->where('entity_id', $project->id)
+                    ->delete();
                 Milestone::withTrashed()->whereIn('id', $milestoneIds)->forceDelete();
                 Task::withTrashed()->whereIn('id', $taskIds)->forceDelete();
                 $project->forceDelete();
@@ -198,10 +201,10 @@ class FiveDayEvmKpiDemoSeeder extends Seeder
 
         $taskCollection = collect($tasks)->values();
         $this->createBaseline($project, $taskCollection);
-        $this->createKpiSnapshots($project, $taskCollection);
+        $this->createKpiSnapshots($project);
 
         Comment::create([
-            'entity_type' => Project::class,
+            'entity_type' => $project->getMorphClass(),
             'entity_id' => $project->id,
             'user_id' => $this->users['pm']->id,
             'content' => 'Demo 5 hari: total budget Rp 500.000, planned effort 56 jam, actual cost Rp 475.000, actual hours 53 jam.',
@@ -251,7 +254,7 @@ class FiveDayEvmKpiDemoSeeder extends Seeder
             'user_id' => $assignee->id,
             'role_on_task' => $this->roleOnTask($assigneeKey),
             'estimated_effort_hours' => $plannedEffort,
-            'assigned_at' => Carbon::parse($start)->startOfDay(),
+            'assigned_at' => Carbon::parse($createdAt),
         ]);
 
         StatusHistory::create([
@@ -270,8 +273,8 @@ class FiveDayEvmKpiDemoSeeder extends Seeder
             'to_status' => 'Done',
             'changed_by' => $this->users['pm']->id,
             'note' => 'Task selesai untuk demo EVM 5 hari.',
-            'created_at' => Carbon::parse($endActual)->setTime(16, 0),
-            'updated_at' => Carbon::parse($endActual)->setTime(16, 0),
+            'created_at' => Carbon::parse($endActual)->setTime(8, 0),
+            'updated_at' => Carbon::parse($endActual)->setTime(8, 0),
         ]);
 
         foreach ($progressByDate as $date => $percentComplete) {
@@ -328,48 +331,49 @@ class FiveDayEvmKpiDemoSeeder extends Seeder
             'value_amount_base' => 500000,
         ]);
 
-        foreach ($tasks as $task) {
+        $tasks = $tasks->values();
+        $plannedEffortByTask = $tasks->mapWithKeys(fn (Task $task) => [
+            $task->id => (float) TaskAssignment::where('task_id', $task->id)->sum('estimated_effort_hours'),
+        ]);
+        $totalPlannedEffort = (float) $plannedEffortByTask->sum();
+        $allocatedWeight = 0.0;
+        $lastIndex = max(0, $tasks->count() - 1);
+
+        foreach ($tasks as $index => $task) {
+            $plannedEffort = (float) ($plannedEffortByTask[$task->id] ?? 0);
+            $weight = $index === $lastIndex
+                ? round(100.0 - $allocatedWeight, 2)
+                : round(
+                    $totalPlannedEffort > 0
+                        ? ($plannedEffort / $totalPlannedEffort) * 100
+                        : 100 / max(1, $tasks->count()),
+                    2
+                );
+            $allocatedWeight += $weight;
+
             TaskBaseline::create([
                 'baseline_id' => $baseline->id,
                 'task_id' => $task->id,
                 'start_planned_base' => $task->start_planned,
                 'end_planned_base' => $task->end_planned,
                 'duration_planned_base' => $task->duration_planned,
-                'weight' => round(100 / max(1, $tasks->count()), 2),
-                'planned_effort_hours' => (float) TaskAssignment::where('task_id', $task->id)->sum('estimated_effort_hours'),
+                'weight' => $weight,
+                'planned_effort_hours' => $plannedEffort,
                 'budget_cost_base' => $task->budget_cost,
             ]);
         }
     }
 
-    private function createKpiSnapshots(Project $project, $tasks): void
+    private function createKpiSnapshots(Project $project): void
     {
+        $kpiService = app(KpiSnapshotServiceInterface::class);
+
         foreach (['2026-06-13', '2026-06-14', '2026-06-15', '2026-06-16', '2026-06-17'] as $date) {
-            $period = ReportingPeriod::create([
-                'project_id' => $project->id,
-                'period_date' => $date,
-                'note' => 'Snapshot KPI demo EVM 5 hari per '.$date.'.',
-            ]);
-
-            $asOf = Carbon::parse($date)->endOfDay();
-            $doneTasks = $tasks->filter(fn (Task $task) => $task->end_actual && Carbon::parse($task->end_actual)->endOfDay()->lte($asOf));
-            $overdueTasks = $tasks->filter(function (Task $task) use ($asOf) {
-                $endPlanned = $task->end_planned ? Carbon::parse($task->end_planned)->endOfDay() : null;
-                $doneAt = $task->end_actual ? Carbon::parse($task->end_actual)->endOfDay() : null;
-
-                return $endPlanned
-                    && $endPlanned->lt($asOf)
-                    && (!$doneAt || $doneAt->gt($asOf));
-            });
-
-            KpiSnapshot::create([
-                'project_id' => $project->id,
-                'period_id' => $period->id,
-                'tasks_total' => $tasks->count(),
-                'tasks_done' => $doneTasks->count(),
-                'overdue_count' => $overdueTasks->count(),
-                'avg_cycle_time_days' => round((float) $doneTasks->avg(fn (Task $task) => $this->duration($task->start_actual, $task->end_actual)), 2),
-            ]);
+            $kpiService->generateForProjectAndDate(
+                $project->id,
+                $date,
+                'Snapshot KPI demo EVM 5 hari per '.$date.'.'
+            );
         }
     }
 
@@ -400,9 +404,8 @@ class FiveDayEvmKpiDemoSeeder extends Seeder
     private function roleOnTask(string $assigneeKey): string
     {
         return match ($assigneeKey) {
-            'pm' => 'Project Manager',
-            'qa' => 'QA Engineer',
-            default => 'Developer',
+            'pm' => 'Manager',
+            default => 'Member',
         };
     }
 

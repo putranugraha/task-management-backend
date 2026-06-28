@@ -1251,7 +1251,7 @@ class TaskService implements TaskServiceInterface
                 continue;
             }
             $alreadyNotified[$userId] = true;
-
+      
             $assignee = $assignment->relationLoaded('user') ? $assignment->user : null;
             if (!$assignee instanceof User) {
                 $assignee = User::find($userId);
