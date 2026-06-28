@@ -173,6 +173,9 @@ class TaskRepository implements TaskRepositoryInterface
         if ($status === 'Done' && !$task->end_actual) {
             $task->end_actual = Carbon::now()->toDateString();
         }
+        if ($status === 'Done') {
+            $task->percent_complete = 100;
+        }
         $task->save();
         if ($status === 'Done') {
             $this->updateProjectCompletionIfDone($task->project_id);

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Models\User;
 use App\Models\StatusHistory;
 use App\Models\Task;
+use App\Models\TaskDependency;
 use App\Models\TaskProgressEntry;
 use App\Models\Milestone;
 use App\Notifications\TaskActivityNotification;
@@ -250,6 +251,17 @@ class TaskService implements TaskServiceInterface
 
     public function updateTask($id, array $data)
     {
+        // Keep progress and status consistent even when the edit form uses the
+        // general task endpoint instead of the dedicated progress endpoint.
+        if (
+            array_key_exists('percent_complete', $data)
+            && is_numeric($data['percent_complete'])
+            && (int) $data['percent_complete'] >= 100
+        ) {
+            $data['percent_complete'] = 100;
+            $data['status'] = 'Done';
+        }
+
         $currentTask = null;
         if (array_key_exists('status', $data) && is_string($data['status'])) {
             $currentTask = $this->repository->getTaskById($id);
@@ -849,7 +861,9 @@ class TaskService implements TaskServiceInterface
             return;
         }
 
-        $task->loadMissing('dependencies.dependsOn');
+        // Always reload dependencies from the database. The task itself may
+        // originate from cache and contain an old predecessor status.
+        $task->load('dependencies.dependsOn');
         $dependencies = collect($task->dependencies ?? []);
         if ($dependencies->isEmpty()) {
             return;
@@ -1350,7 +1364,16 @@ class TaskService implements TaskServiceInterface
     protected function clearCaches($id = null, $status = null, $projectId = null, $priority = null, $milestoneId = null): void
     {
         Cache::forget(self::CACHE_ALL);
-        if ($id) Cache::forget(self::CACHE_ID_PREFIX.$id);
+        if ($id) {
+            Cache::forget(self::CACHE_ID_PREFIX.$id);
+
+            // A predecessor status change affects dependency validation and
+            // presentation for every successor task.
+            TaskDependency::query()
+                ->where('depends_on_task_id', $id)
+                ->pluck('task_id')
+                ->each(fn ($dependentTaskId) => Cache::forget(self::CACHE_ID_PREFIX.$dependentTaskId));
+        }
         if ($status) Cache::forget(self::CACHE_STATUS_PREFIX.$status);
         if ($projectId) Cache::forget(self::CACHE_PROJECT_PREFIX.$projectId);
         if ($priority) Cache::forget(self::CACHE_PRIORITY_PREFIX.$priority);
