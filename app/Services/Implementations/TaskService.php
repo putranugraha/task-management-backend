@@ -687,19 +687,24 @@ class TaskService implements TaskServiceInterface
     {
         if (!is_numeric($percent) || $percent < 0 || $percent > 100) return null;
 
+        $nextPercent = (int) $percent;
         $before = $this->getTaskById($id);
         if ($before instanceof Task) {
             $currentPercent = (int) ($before->percent_complete ?? 0);
-            $nextPercent = (int) $percent;
-            if ($nextPercent > $currentPercent) {
-                if ($nextPercent >= 100) {
-                    $this->assertDependencyStatusTransitionAllowed($before, 'Done');
-                } elseif ($nextPercent > 0) {
-                    $this->assertDependencyStatusTransitionAllowed($before, 'In Progress');
-                }
+            if ($nextPercent >= 100 && $before->status !== 'Done') {
+                $this->assertDependencyStatusTransitionAllowed($before, 'Done');
+            } elseif ($nextPercent > $currentPercent && $nextPercent > 0) {
+                $this->assertDependencyStatusTransitionAllowed($before, 'In Progress');
             }
         }
-        $task = $this->repository->updateTaskProgress($id, (int) $percent);
+
+        // Finishing progress must use the same domain operation as the complete
+        // action so status, end_actual, project completion, and dependencies
+        // remain consistent.
+        $task = $nextPercent >= 100
+            ? $this->repository->completeTask($id)
+            : $this->repository->updateTaskProgress($id, $nextPercent);
+
         $this->clearCaches(
             $id,
             $task->status ?? null,
@@ -714,12 +719,13 @@ class TaskService implements TaskServiceInterface
             // Record progress update in status history so it appears in "Status History" feed.
             $beforePct = (int) ($before->percent_complete ?? 0);
             $afterPct = (int) ($task->percent_complete ?? 0);
-            if ($before && $beforePct !== $afterPct) {
-                $status = $task->status ?? ($before->status ?? 'To Do');
+            $beforeStatus = $before->status ?? null;
+            $afterStatus = $task->status ?? $beforeStatus;
+            if ($before && ($beforePct !== $afterPct || $beforeStatus !== $afterStatus)) {
                 StatusHistory::create([
                     'task_id' => $task->id,
-                    'from_status' => $status,
-                    'to_status' => $status,
+                    'from_status' => $beforeStatus,
+                    'to_status' => $afterStatus,
                     'changed_by' => Auth::id(),
                     'note' => 'Progress: '.$beforePct.' -> '.$afterPct,
                 ]);
@@ -733,6 +739,8 @@ class TaskService implements TaskServiceInterface
                 'milestone_id' => $task->milestone_id,
                 'percent_complete_before' => $before->percent_complete ?? null,
                 'percent_complete_after' => $task->percent_complete,
+                'status_before' => $beforeStatus,
+                'status_after' => $afterStatus,
             ];
 
             $activity = activity('tasks')
@@ -752,6 +760,16 @@ class TaskService implements TaskServiceInterface
                     'message' => 'Progress task '.$task->title.' berubah dari '.$beforePct.'% menjadi '.$afterPct.'%.',
                 ]);
             }
+
+            if ($before && $beforeStatus !== $afterStatus) {
+                $this->notifyTaskWatchers($task, 'task_status_changed', [
+                    'status_before' => $beforeStatus,
+                    'status_after' => $afterStatus,
+                    'message' => 'Status task '.$task->title.' berubah dari '.($beforeStatus ?? '-').' menjadi '.$afterStatus.'.',
+                ]);
+            }
+
+            $this->syncMilestoneCompletion($task);
         }
 
         return $task;
